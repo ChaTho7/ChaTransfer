@@ -1,11 +1,8 @@
 package com.chatho.chatransfer.adapter
 
 import android.view.LayoutInflater
-import android.view.View
 import android.view.ViewGroup
-import android.widget.LinearLayout
 import androidx.constraintlayout.widget.ConstraintLayout
-import androidx.core.view.marginTop
 import androidx.recyclerview.widget.RecyclerView
 import com.chatho.chatransfer.databinding.ServerFilesRecyclerBinding
 
@@ -26,7 +23,7 @@ class ServerFilesRecyclerAdapter(val filenames: ArrayList<String>, private val s
             layoutParams.topMargin = 10
             holder.binding.serverFileFilename.layoutParams = layoutParams
 
-            val parentView = holder.binding.root // Change this to your actual parent view type
+            val parentView = holder.binding.root
             parentView.requestLayout()
         }
         holder.binding.serverFileFilename.text = filenames[position]

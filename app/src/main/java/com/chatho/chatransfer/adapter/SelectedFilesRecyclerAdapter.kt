@@ -2,13 +2,11 @@ package com.chatho.chatransfer.adapter
 
 import android.content.Context
 import android.view.LayoutInflater
-import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.recyclerview.widget.RecyclerView
 import com.chatho.chatransfer.databinding.SelectedFilesRecyclerBinding
-import kotlin.coroutines.coroutineContext
 
 class SelectedFilesRecyclerAdapter(val selectedFiles: ArrayList<String>) :
     RecyclerView.Adapter<SelectedFilesRecyclerAdapter.SelectedFilesVH>() {
@@ -29,7 +27,7 @@ class SelectedFilesRecyclerAdapter(val selectedFiles: ArrayList<String>) :
             layoutParams.topMargin = 10
             holder.binding.selectedFileFilename.layoutParams = layoutParams
 
-            val parentView = holder.binding.root // Change this to your actual parent view type
+            val parentView = holder.binding.root
             parentView.requestLayout()
         }
         holder.binding.selectedFileFilename.text = selectedFiles[position]

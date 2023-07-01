@@ -1,4 +1,4 @@
-package com.chatho.chatransfer.util
+package com.chatho.chatransfer.handle
 
 import android.Manifest
 import android.content.Context

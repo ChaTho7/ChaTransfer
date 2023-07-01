@@ -5,7 +5,7 @@ import okhttp3.RequestBody
 import okio.BufferedSink
 import java.io.IOException
 
-class ProgressRequestBody(
+class UploadFilesProgressRequestBody(
     private val chunk: ByteArray,
     private val contentType: MediaType?,
     private val progressListener: ProgressListener,
@@ -45,8 +45,9 @@ class ProgressRequestBody(
     }
 
     companion object {
-        var toUploadBytesTotal = 0L
         var totalBytesRead = 0L
+        var toUploadBytesTotal = 0L
+        var totalFilesSize = 0
         private const val DEFAULT_BUFFER_SIZE = 2048
     }
 }
