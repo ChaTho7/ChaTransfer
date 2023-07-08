@@ -71,6 +71,7 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
         })
     }
 
+
     fun getFiles(callback: (ArrayList<String>) -> Unit) {
         val retrofit =
             Retrofit.Builder().baseUrl(domain).addConverterFactory(GsonConverterFactory.create())
@@ -111,6 +112,7 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
             }
         })
     }
+
 
     fun downloadFiles(
         fileNames: ArrayList<String>

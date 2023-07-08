@@ -36,6 +36,7 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        setAppName()
         MainActivityHolder.activity = this
         api = FlaskAPI(null)
 
@@ -228,5 +229,25 @@ class MainActivity : AppCompatActivity() {
 
         binding.progressBar.visibility = View.GONE
         binding.swStatus.text = spannableStringBuilder
+    }
+
+    private fun setAppName() {
+        val spannableStringBuilder = SpannableStringBuilder()
+
+        val text1 = "CHA"
+        val spannableString1 = SpannableString(text1)
+        val color1 = ContextCompat.getColor(this, R.color.dark_blue)
+        val colorSpan1 = ForegroundColorSpan(color1)
+        spannableString1.setSpan(colorSpan1, 0, text1.length, 0)
+        spannableStringBuilder.append(spannableString1)
+
+        val text2 = "TRANSFER"
+        val spannableString2 = SpannableString(text2)
+        val color2 = ContextCompat.getColor(this, R.color.red)
+        val colorSpan2 = ForegroundColorSpan(color2)
+        spannableString2.setSpan(colorSpan2, 0, text2.length, 0)
+        spannableStringBuilder.append(spannableString2)
+
+        binding.pageTitle.text = spannableStringBuilder
     }
 }
