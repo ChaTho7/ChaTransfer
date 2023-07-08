@@ -14,9 +14,9 @@ interface FlaskApiService {
     @GET("/get_filenames")
     fun getFilenames(): Call<List<String>>
 
-    @GET
+    @GET("download_file/{filename}")
     @Streaming
-    suspend fun downloadFiles(@Url fileUrl: String): Response<ResponseBody>
+    suspend fun downloadFiles(@Path("filename") filename: String): Response<ResponseBody>
 
     @Multipart
     @POST("/upload_files")

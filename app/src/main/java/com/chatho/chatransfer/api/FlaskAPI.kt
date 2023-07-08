@@ -1,5 +1,6 @@
 package com.chatho.chatransfer.api
 
+import android.net.Uri
 import android.widget.Toast
 import com.chatho.chatransfer.Constants
 import com.chatho.chatransfer.handle.HandleFileSystem
@@ -123,19 +124,19 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
     }
 
     private fun singleFileDownload(
-        fileName: String,
+        filename: String,
         savePath: String,
         index: Int,
         callback: (Int) -> Unit,
     ) {
-        val fileUrl = "/download_file?filename=$fileName"
+        val encodedFilename = Uri.encode(filename)
 
         GlobalScope.launch(Dispatchers.IO) {
             try {
                 val retrofit = Retrofit.Builder().baseUrl(domain).build()
                 val apiService = retrofit.create(FlaskApiService::class.java)
 
-                val response = apiService.downloadFiles(fileUrl)
+                val response = apiService.downloadFiles(encodedFilename)
 
                 if (response.isSuccessful) {
                     val responseBody: ResponseBody? = response.body()
@@ -166,12 +167,12 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
                                 val progress =
                                     (totalBytesRead.toDouble() / totalBytes * 100).toInt()
                                 handleNotification.updateForeground(
-                                    "downloadFiles", progress, fileName, index
+                                    "downloadFiles", progress, filename, index
                                 )
 
                                 activity.runOnUiThread {
                                     activity.downloadFilesProgressCallback(
-                                        fileName, totalBytesRead, totalBytes
+                                        filename, totalBytesRead, totalBytes
                                     )
                                 }
                             }
@@ -185,7 +186,7 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
                         activity.runOnUiThread {
                             Toast.makeText(
                                 activity,
-                                "Error has occured in ${fileName}: $errorBody",
+                                "Error has occured in ${filename}: $errorBody",
                                 Toast.LENGTH_LONG
                             ).show()
                         }
