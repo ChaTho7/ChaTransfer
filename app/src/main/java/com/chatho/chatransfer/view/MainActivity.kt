@@ -1,25 +1,28 @@
 package com.chatho.chatransfer.view
 
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.text.SpannableString
 import android.text.SpannableStringBuilder
 import android.text.style.ForegroundColorSpan
 import android.view.View
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.chatho.chatransfer.R
 import com.chatho.chatransfer.adapter.SelectedFilesRecyclerAdapter
 import com.chatho.chatransfer.adapter.ServerFilesRecyclerAdapter
 import com.chatho.chatransfer.api.FlaskAPI
-import com.chatho.chatransfer.holder.MainActivityHolder
 import com.chatho.chatransfer.databinding.ActivityMainBinding
 import com.chatho.chatransfer.handle.HandleFileSystem
 import com.chatho.chatransfer.handle.HandleFileSystem.Companion.getDownloadsDirectory
 import com.chatho.chatransfer.handle.HandleNotification
 import com.chatho.chatransfer.handle.HandlePermission
 import com.chatho.chatransfer.holder.DownloadFilesProgressHolder
+import com.chatho.chatransfer.holder.MainActivityHolder
 import java.io.File
 
 class MainActivity : AppCompatActivity() {
@@ -57,8 +60,13 @@ class MainActivity : AppCompatActivity() {
         handleListeners()
     }
 
-    fun downloadFilesProgressCallback(fileName: String, bytesRead: Long, totalBytes: Long) {
-        val progress = (bytesRead.toDouble() / totalBytes * 100).toInt()
+    override fun onResume() {
+        super.onResume()
+
+        hideSystemBars()
+    }
+
+    fun downloadFilesProgressCallback(fileName: String, progress: Int) {
         binding.progress.text = "DOWNLOAD PROGRESS OF $fileName: % $progress"
     }
 
@@ -125,8 +133,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun getFiles() {
         if (isServerOnline) {
-            api.getFiles { filenames ->
-                serverFilesAdapter = ServerFilesRecyclerAdapter(filenames, selectedFilesAdapter)
+            api.getFileInfoList { fileInfoList ->
+                serverFilesAdapter = ServerFilesRecyclerAdapter(fileInfoList, selectedFilesAdapter)
                 binding.serverFiles.adapter = serverFilesAdapter
 
                 binding.downloadFilesButton.visibility = View.VISIBLE
@@ -195,7 +203,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun selectAllFiles() {
         if (serverFilesAdapter !== null) {
-            selectedFilesAdapter.selectAllFiles(this, serverFilesAdapter!!.filenames)
+            selectedFilesAdapter.selectAllFiles(this, ArrayList(serverFilesAdapter!!.fileInfoList))
         } else {
             Toast.makeText(
                 this, "You should get files from server first.", Toast.LENGTH_SHORT
@@ -249,5 +257,14 @@ class MainActivity : AppCompatActivity() {
         spannableStringBuilder.append(spannableString2)
 
         binding.pageTitle.text = spannableStringBuilder
+    }
+
+    private fun hideSystemBars() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        controller.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller.hide(WindowInsetsCompat.Type.navigationBars())
     }
 }

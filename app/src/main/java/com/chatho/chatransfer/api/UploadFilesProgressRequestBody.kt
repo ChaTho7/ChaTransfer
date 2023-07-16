@@ -48,6 +48,8 @@ class UploadFilesProgressRequestBody(
         var totalBytesRead = 0L
         var toUploadBytesTotal = 0L
         var totalFilesSize = 0
+        var startTime = 0L
+        var endTime = 0L
         private const val DEFAULT_BUFFER_SIZE = 2048
     }
 }

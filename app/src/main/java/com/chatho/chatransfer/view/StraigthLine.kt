@@ -14,13 +14,14 @@ class StraightLineView(context: Context, attrs: AttributeSet? = null) : View(con
     init {
         linePaint.strokeWidth = 3f
         linePaint.color = ContextCompat.getColor(context, R.color.cyan)
+        linePaint.alpha = 200
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        val startX = 100f
+        val startX = 0f
         val startY = 7f
-        val endX = canvas.width - 100f
+        val endX = width - startX
         val endY = 7f
         canvas.drawLine(startX, startY, endX, endY, linePaint)
     }

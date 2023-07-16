@@ -4,35 +4,40 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.recyclerview.widget.RecyclerView
+import com.chatho.chatransfer.api.GetFileInfoListResponse
 import com.chatho.chatransfer.databinding.ServerFilesRecyclerBinding
 
-class ServerFilesRecyclerAdapter(val filenames: ArrayList<String>, private val selectedFilesAdapter: SelectedFilesRecyclerAdapter) :
-    RecyclerView.Adapter<ServerFilesRecyclerAdapter.ServerFilesVH>() {
+class ServerFilesRecyclerAdapter(
+    val fileInfoList: List<GetFileInfoListResponse>,
+    private val selectedFilesAdapter: SelectedFilesRecyclerAdapter
+) : RecyclerView.Adapter<ServerFilesRecyclerAdapter.ServerFilesVH>() {
 
-    class ServerFilesVH(val binding: ServerFilesRecyclerBinding) : RecyclerView.ViewHolder(binding.root) {
-    }
+    class ServerFilesVH(val binding: ServerFilesRecyclerBinding) :
+        RecyclerView.ViewHolder(binding.root) {}
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ServerFilesVH {
-        val binding = ServerFilesRecyclerBinding.inflate(LayoutInflater.from(parent.context),parent,false)
+        val binding =
+            ServerFilesRecyclerBinding.inflate(LayoutInflater.from(parent.context), parent, false)
         return ServerFilesVH(binding)
     }
 
     override fun onBindViewHolder(holder: ServerFilesVH, position: Int) {
         if (position > 0) {
-            val layoutParams = holder.binding.serverFileFilename.layoutParams as ConstraintLayout.LayoutParams
+            val layoutParams =
+                holder.binding.serverFileFilename.layoutParams as ConstraintLayout.LayoutParams
             layoutParams.topMargin = 10
             holder.binding.serverFileFilename.layoutParams = layoutParams
 
             val parentView = holder.binding.root
             parentView.requestLayout()
         }
-        holder.binding.serverFileFilename.text = filenames[position]
+        holder.binding.serverFileFilename.text = fileInfoList[position].filename
         holder.itemView.setOnClickListener {
-            selectedFilesAdapter.addNewSelectedFile(filenames[position])
+            selectedFilesAdapter.addNewSelectedFile(fileInfoList[position])
         }
     }
 
     override fun getItemCount(): Int {
-        return filenames.size
+        return fileInfoList.size
     }
 }

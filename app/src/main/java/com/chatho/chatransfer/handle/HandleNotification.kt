@@ -13,42 +13,42 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.chatho.chatransfer.R
 import com.chatho.chatransfer.api.FlaskAPI
+import com.chatho.chatransfer.api.GetFileInfoListResponse
 import com.chatho.chatransfer.api.UploadFilesProgressRequestBody
 import com.chatho.chatransfer.holder.DownloadFilesProgressHolder
 import java.io.File
-
 
 class HandleNotification() : Service() {
     private val flaskAPI = FlaskAPI(this)
     private lateinit var notificationBuilder: NotificationCompat.Builder
     private lateinit var notificationManager: NotificationManager
 
-    private fun setupNotification(fileName: String) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channelId = "chatransfer"
-            val channelName = "ChaTransfer Channel"
-            val channel =
-                NotificationChannel(channelId, channelName, NotificationManager.IMPORTANCE_DEFAULT)
+    private fun setupNotification() {
+        val channelId = "chatransfer"
+        val channelName = "ChaTransfer Channel"
+        val channel =
+            NotificationChannel(channelId, channelName, NotificationManager.IMPORTANCE_DEFAULT)
 
-            notificationManager =
-                getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(channel)
+        notificationManager =
+            getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.createNotificationChannel(channel)
 
-            notificationBuilder =
-                NotificationCompat.Builder(this, channelId).setContentTitle(fileName)
-                    .setSmallIcon(R.mipmap.ic_launcher_foreground).setSilent(true)
-                    .setColor(ContextCompat.getColor(this, R.color.black))
-        }
+        notificationBuilder =
+            NotificationCompat.Builder(this, channelId).setProgress(100, 0, true)
+                .setSmallIcon(R.mipmap.ic_launcher_foreground).setSilent(true)
+                .setColor(ContextCompat.getColor(this, R.color.black))
+
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val apiMethod = intent!!.getStringExtra("apiMethod")!!
-        val fileNames = intent.getStringArrayListExtra("fileNames")!!
+        val fileInfos =
+            intent.getSerializableExtra("fileInfos") as? ArrayList<GetFileInfoListResponse>
 
-        setupNotification(fileNames[0])
+        setupNotification()
 
         when (apiMethod) {
-            "downloadFiles" -> flaskAPI.downloadFiles(fileNames)
+            "downloadFiles" -> flaskAPI.downloadFiles(fileInfos!!)
 
             "uploadFiles" -> flaskAPI.uploadFiles(HandleFileSystem.uploadFileList!!)
 
@@ -67,15 +67,18 @@ class HandleNotification() : Service() {
             "uploadFiles" -> notificationBuilder.setSubText("Uploading ${currentIndex + 1} of ${UploadFilesProgressRequestBody.totalFilesSize}")
             "downloadFiles" -> notificationBuilder.setSubText("Downloading ${currentIndex + 1} of ${DownloadFilesProgressHolder.totalFilesSize}")
         }
-        notificationBuilder.setContentTitle(fileName)
+        notificationBuilder.setContentTitle("$fileName (% $progress)")
         notificationBuilder.setProgress(100, progress, false)
         notificationManager.notify(FOREGROUND_ID, notificationBuilder.build())
     }
 
     fun finishForeground(apiMethod: String, filenames: List<String>) {
-        notificationBuilder.setSubText(null)
         when (apiMethod) {
             "uploadFiles" -> {
+                val uploadTimeInString =
+                    calculateElapsedTime(UploadFilesProgressRequestBody.endTime - UploadFilesProgressRequestBody.startTime)
+
+                notificationBuilder.setSubText(uploadTimeInString)
                 notificationBuilder.setContentTitle("${if (filenames.size > 1) "${UploadFilesProgressRequestBody.totalFilesSize} Files" else "File"} Uploaded Successfully")
                 notificationBuilder.setStyle(
                     NotificationCompat.BigTextStyle().bigText(filenames.joinToString("\n"))
@@ -83,6 +86,10 @@ class HandleNotification() : Service() {
             }
 
             "downloadFiles" -> {
+                val downloadTimeInString =
+                    calculateElapsedTime(DownloadFilesProgressHolder.endTime - DownloadFilesProgressHolder.startTime)
+
+                notificationBuilder.setSubText(downloadTimeInString)
                 notificationBuilder.setContentTitle("${if (filenames.size > 1) "${DownloadFilesProgressHolder.totalFilesSize} Files" else "File"} Downloaded Successfully")
                 notificationBuilder.setStyle(
                     NotificationCompat.BigTextStyle().bigText(filenames.joinToString("\n"))
@@ -95,11 +102,18 @@ class HandleNotification() : Service() {
             notificationManager.notify(
                 FOREGROUND_ID, notificationBuilder.build()
             ) // Put inside postDelayed() to fix not update due to thread stuff...
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                stopForeground(STOP_FOREGROUND_DETACH)
-            }
+            stopForeground(STOP_FOREGROUND_DETACH)
+
             FOREGROUND_ID += 1
         }, 250)
+    }
+
+    private fun calculateElapsedTime(timeElapsedInMs: Long): String {
+        val timeInMin = timeElapsedInMs / (1000 * 60)
+        val timeInSec = (timeElapsedInMs % (1000 * 60)) / 1000
+        val timeInMs = timeElapsedInMs % (1000)
+
+        return "${if (timeInMin < 10L) "0$timeInMin" else timeInMin}:" + "${if (timeInSec < 10L) "0$timeInSec" else timeInSec}:" + "${if (timeInMs < 10L) "0$timeInMs" else timeInMs}"
     }
 
     override fun onBind(p0: Intent?): IBinder? {
@@ -115,9 +129,9 @@ class HandleNotification() : Service() {
             ContextCompat.startForegroundService(context, intent)
         }
 
-        fun startDownloadFiles(context: Context, files: ArrayList<String>) {
+        fun startDownloadFiles(context: Context, fileInfoList: ArrayList<GetFileInfoListResponse>) {
             val intent = Intent(context, HandleNotification::class.java)
-            intent.putExtra("fileNames", files)
+            intent.putExtra("fileInfos", fileInfoList)
             intent.putExtra("apiMethod", "downloadFiles")
             ContextCompat.startForegroundService(context, intent)
         }

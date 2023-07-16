@@ -11,6 +11,9 @@ import android.view.View
 import android.view.animation.Animation
 import android.view.animation.AnimationUtils
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.chatho.chatransfer.R
 import com.chatho.chatransfer.databinding.ActivitySplashBinding
 
@@ -53,6 +56,7 @@ class SplashActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
 
+        hideSystemBars()
         binding.animationView.playAnimation()
     }
 
@@ -74,5 +78,14 @@ class SplashActivity : AppCompatActivity() {
         spannableStringBuilder.append(spannableString2)
 
         binding.appName.text = spannableStringBuilder
+    }
+
+    private fun hideSystemBars() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        controller.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller.hide(WindowInsetsCompat.Type.systemBars())
     }
 }

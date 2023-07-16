@@ -6,14 +6,15 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.recyclerview.widget.RecyclerView
+import com.chatho.chatransfer.Utils
+import com.chatho.chatransfer.api.GetFileInfoListResponse
 import com.chatho.chatransfer.databinding.SelectedFilesRecyclerBinding
 
-class SelectedFilesRecyclerAdapter(val selectedFiles: ArrayList<String>) :
+class SelectedFilesRecyclerAdapter(val selectedFiles: ArrayList<GetFileInfoListResponse>) :
     RecyclerView.Adapter<SelectedFilesRecyclerAdapter.SelectedFilesVH>() {
 
     class SelectedFilesVH(val binding: SelectedFilesRecyclerBinding) :
-        RecyclerView.ViewHolder(binding.root) {
-    }
+        RecyclerView.ViewHolder(binding.root)
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SelectedFilesVH {
         val binding =
@@ -23,14 +24,20 @@ class SelectedFilesRecyclerAdapter(val selectedFiles: ArrayList<String>) :
 
     override fun onBindViewHolder(holder: SelectedFilesVH, position: Int) {
         if (position > 0) {
-            val layoutParams = holder.binding.selectedFileFilename.layoutParams as ConstraintLayout.LayoutParams
+            val layoutParams =
+                holder.binding.selectedFileFilename.layoutParams as ConstraintLayout.LayoutParams
             layoutParams.topMargin = 10
             holder.binding.selectedFileFilename.layoutParams = layoutParams
 
             val parentView = holder.binding.root
             parentView.requestLayout()
         }
-        holder.binding.selectedFileFilename.text = selectedFiles[position]
+        holder.binding.selectedFileFilename.text = selectedFiles[position].filename
+        holder.binding.selectedFileSize.text = "${
+            Utils.toDouble(
+                (selectedFiles[position].fileSize.toDouble()) / (1024.0 * 1024.0), 2
+            )
+        } MB"
         holder.itemView.setOnClickListener {
             removeSelectedFile(position)
         }
@@ -40,14 +47,15 @@ class SelectedFilesRecyclerAdapter(val selectedFiles: ArrayList<String>) :
         return selectedFiles.size
     }
 
-    fun selectAllFiles(context: Context, filenames: ArrayList<String>) {
-        if (filenames.size > 0) {
+    fun selectAllFiles(context: Context, fileInfoList: ArrayList<GetFileInfoListResponse>) {
+        if (fileInfoList.size > 0) {
             selectedFiles.clear()
-            selectedFiles.addAll(filenames)
+            selectedFiles.addAll(fileInfoList)
             println("All files added to download list.")
             notifyDataSetChanged()
         } else {
-            Toast.makeText(context, "There is no file fetched from server.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "There is no file fetched from server.", Toast.LENGTH_SHORT)
+                .show()
         }
     }
 
@@ -61,17 +69,17 @@ class SelectedFilesRecyclerAdapter(val selectedFiles: ArrayList<String>) :
         }
     }
 
-    fun addNewSelectedFile(filename: String) {
-        if (!selectedFiles.contains(filename)) {
-            selectedFiles.add(filename)
-            println("$filename added to download list.")
+    fun addNewSelectedFile(fileInfo: GetFileInfoListResponse) {
+        if (!selectedFiles.any { it.filename == fileInfo.filename }) {
+            selectedFiles.add(0, fileInfo)
+            println("${fileInfo.filename} added to download list.")
             notifyDataSetChanged()
         }
     }
 
     private fun removeSelectedFile(index: Int) {
-        val filename = selectedFiles.removeAt(index)
-        println("$filename removed from download list.")
+        val fileInfo = selectedFiles.removeAt(index)
+        println("${fileInfo.filename} removed from download list.")
         notifyItemRemoved(index)
         notifyItemRangeChanged(index, selectedFiles.size)
     }

@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId "com.chatho.chatransfer"
-        minSdk 23
+        minSdk 26
         targetSdk 33
         versionCode 1
         versionName "1.0"
@@ -34,7 +34,6 @@ android {
     }
     buildFeatures {
         viewBinding true
-        dataBinding true
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
