@@ -244,8 +244,20 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
         GlobalScope.launch(Dispatchers.IO) {
             while (true) {
                 if (downloadedChunks.size > 0) {
-                    val fileSavePath =
+                    var fileSavePath =
                         "${DownloadFilesProgressHolder.saveFolderPath}/${filenames[downloadedFileIndex]}"
+                    var file = File(fileSavePath)
+
+                    var index = 1
+                    val filenameWithoutExtension = file.nameWithoutExtension
+                    val fileExtension = file.extension
+                    while (file.exists()) {
+                        fileSavePath =
+                            "${DownloadFilesProgressHolder.saveFolderPath}/${filenameWithoutExtension}_${index}.${fileExtension}"
+                        file = File(fileSavePath)
+                        index += 1
+                    }
+
                     HandleFileSystem.combineDownloadedFileChunks(
                         downloadedChunks, fileSavePath, downloadedChunkStartIndexes
                     )
