@@ -4,6 +4,7 @@ import android.net.Uri
 import android.util.Log
 import android.widget.Toast
 import com.chatho.chatransfer.Constants
+import com.chatho.chatransfer.Utils
 import com.chatho.chatransfer.handle.HandleFileSystem
 import com.chatho.chatransfer.handle.HandleFileSystem.Companion.clearPathDirectory
 import com.chatho.chatransfer.handle.HandleNotification
@@ -12,11 +13,9 @@ import com.chatho.chatransfer.holder.MainActivityHolder
 import com.chatho.chatransfer.view.MainActivity
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
-import okhttp3.MediaType
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
-import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.ResponseBody
 import retrofit2.Call
 import retrofit2.Callback
@@ -159,7 +158,7 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
         val tempFile = File.createTempFile("chunk_${chunkIndex}_", null)
         val tempFilePath = tempFile.absolutePath
 
-        GlobalScope.launch(Dispatchers.IO) {
+        Utils.runInCoroutineScope(Dispatchers.IO) {
             try {
                 val retrofit = Retrofit.Builder().baseUrl(domain).build()
                 val apiService = retrofit.create(FlaskApiService::class.java)
@@ -241,7 +240,7 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
         downloadedFileIndex: Int,
     ) {
         Log.i("Download File", "CALLBACK HAS BEEN CALLED")
-        GlobalScope.launch(Dispatchers.IO) {
+        Utils.runInCoroutineScope(Dispatchers.IO) {
             while (true) {
                 if (downloadedChunks.size > 0) {
                     var fileSavePath =
@@ -416,11 +415,11 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
         index: Int
     ) {
         val chunkIdRequestBody =
-            RequestBody.create(MediaType.parse("text/plain"), chunkId.toString())
+            chunkId.toString().toRequestBody("text/plain".toMediaTypeOrNull())
         val totalChunksRequestBody =
-            RequestBody.create(MediaType.parse("text/plain"), totalChunks.toString())
+            totalChunks.toString().toRequestBody("text/plain".toMediaTypeOrNull())
         val chunkRequestBody = UploadFilesProgressRequestBody(
-            chunkData, MediaType.parse("multipart/form-data"), uploadProgressListener, filename
+            chunkData, "multipart/form-data".toMediaTypeOrNull(), uploadProgressListener, filename
         )
 
         val chunk = MultipartBody.Part.createFormData(

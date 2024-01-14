@@ -30,7 +30,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var api: FlaskAPI
     private lateinit var filePicker: HandleFileSystem
     private var handlePermission = HandlePermission(this)
-    private val selectedFilesAdapter = SelectedFilesRecyclerAdapter(arrayListOf())
+    private lateinit var selectedFilesAdapter : SelectedFilesRecyclerAdapter
     private var serverFilesAdapter: ServerFilesRecyclerAdapter? = null
     private var isServerOnline: Boolean = false
 
@@ -39,6 +39,7 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        selectedFilesAdapter  = SelectedFilesRecyclerAdapter(arrayListOf(), binding)
         setAppName()
         MainActivityHolder.activity = this
         api = FlaskAPI(null)
