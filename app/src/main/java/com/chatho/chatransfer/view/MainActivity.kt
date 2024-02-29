@@ -108,7 +108,7 @@ class MainActivity : AppCompatActivity() {
             downloadFiles()
         }
         binding.getFilesButton.setOnClickListener {
-            getFiles()
+            getFilesFromApi()
         }
         binding.selectAllFilesButton.setOnClickListener {
             selectAllFiles()
@@ -132,7 +132,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun getFiles() {
+    private fun getFilesFromApi() {
         if (isServerOnline) {
             api.getFileInfoList { fileInfoList ->
                 serverFilesAdapter = ServerFilesRecyclerAdapter(fileInfoList, selectedFilesAdapter)
@@ -144,7 +144,7 @@ class MainActivity : AppCompatActivity() {
                 binding.clearSelectedFilesButton.visibility = View.VISIBLE
             }
         } else {
-            getServerStatus(::getFiles)
+            getServerStatus(::getFilesFromApi)
         }
     }
 
@@ -195,7 +195,7 @@ class MainActivity : AppCompatActivity() {
                     handlePermission.getRuntimePermissions()
                 }
             } else {
-                Toast.makeText(this, "There is no files selected.", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "There is no file selected.", Toast.LENGTH_LONG).show()
             }
         } else {
             getServerStatus(::downloadFiles)

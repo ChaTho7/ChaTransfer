@@ -1,8 +1,12 @@
 package com.chatho.chatransfer.handle
 
 import android.content.ContentResolver
+import android.database.Cursor
+import android.media.MediaScannerConnection
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
+import android.provider.MediaStore
 import android.util.Log
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -24,31 +28,85 @@ class HandleFileSystem(private val callback: (List<File>) -> Unit) {
     private fun filePickerLauncher(): ActivityResultLauncher<String> {
         return activity.registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
             if (!isNullOrDefault(uris)) {
-                val fileList = uris.map { uriString ->
+                val fileList = uris.mapNotNull { uriString ->
                     val uri = Uri.parse(uriString.toString())
-                    val contentResolver: ContentResolver = activity.contentResolver
+//                    val contentResolver: ContentResolver = activity.contentResolver
+//
+//                    val originalFileName = getOriginalFileName(contentResolver, uri)
+//                    val filePath = getDataColumn(contentResolver, originalFileName)
+//
+//                    if (!filePath.isNullOrBlank()) {
+//                        File(filePath)
+//                    } else {
+//                        null
+//                    }
 
-                    val originalFileName = getOriginalFileName(contentResolver, uri)
-                    val fileExtension = getFileExtension(originalFileName)
-                    val tempFile = File.createTempFile("temp", fileExtension)
-                    val file = File(tempFile.parent, originalFileName)
-
-                    val outputStream = FileOutputStream(file)
-
-                    contentResolver.openInputStream(uri)?.use { inputStream ->
-                        inputStream.copyTo(outputStream)
-                    }
-
-                    file
+                    val file = File(
+                        Environment.getExternalStorageDirectory().absolutePath + "/${
+                            uri.lastPathSegment?.substringAfter(
+                                ":"
+                            )
+                        }"
+                    )
+                    if (file.isFile) file else null
                 }
 
-                uploadFileList = fileList
-                callback(fileList)
+                if (fileList.isNotEmpty()) {
+                    uploadFileList = fileList
+                    callback(fileList)
+                }
+            }
+        }
+    }
+
+    private fun getDataColumn(
+        contentResolver: ContentResolver, originalFileName: String
+    ): String? {
+//        val folderFile = File(Environment.getExternalStorageDirectory().absolutePath)
+//        folderFile.listFiles()?.forEach {
+//            scanFiles(it)
+//        }
+
+//        contentResolver.delete(uri, null, null)
+
+
+        var cursor: Cursor? = null
+        val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL)
+        } else {
+            MediaStore.Files.getContentUri("external")
+        }
+        val projection = arrayOf(MediaStore.Files.FileColumns.DATA)
+        val selection = "${MediaStore.Files.FileColumns.DISPLAY_NAME} = ?"
+        val includedArgs = arrayOf(originalFileName)
+        val selectionArgs = includedArgs.map { arg -> "%$arg%" }.toTypedArray()
+
+        try {
+            cursor = contentResolver.query(uri, projection, selection, selectionArgs, null)
+            if (cursor != null && cursor.moveToFirst()) {
+                val pathColumn = cursor.getColumnIndex(MediaStore.Files.FileColumns.DATA)
+                return cursor.getString(pathColumn)
+            }
+        } finally {
+            cursor?.close()
+        }
+        return null
+    }
+
+    private fun scanFiles(file: File) {
+        if (file.isFile) {
+            MediaScannerConnection.scanFile(
+                activity, arrayOf(file.absolutePath), null, null
+            )
+        } else if (file.isDirectory) {
+            file.listFiles()?.forEach {
+                scanFiles(it)
             }
         }
     }
 
     companion object {
+        private const val CHUNK_SIZE = 2 * 1024 * 1024  // 2 MB
         var uploadFileList: List<File>? = null
 
         fun getDownloadsDirectory(): String? {
@@ -70,23 +128,22 @@ class HandleFileSystem(private val callback: (List<File>) -> Unit) {
             Log.i("HandleFileSystem", "-----CACHE CLEANING FINISHED-----")
         }
 
-        fun calculateTotalChunks(fileSize: Long, chunkSize: Int): Int {
-            return ((fileSize + chunkSize - 1) / chunkSize).toInt()
+        fun calculateTotalChunks(fileSize: Long): Int {
+            return ((fileSize + CHUNK_SIZE - 1) / CHUNK_SIZE).toInt()
         }
 
         fun calculateChunkRanges(fileSizes: List<Int>, fileIndex: Int): MutableList<String> {
-            val chunkSize = 1024 * 1024 * 2 // 2 MB
-            val numChunks = fileSizes[fileIndex] / chunkSize
-            val remainder = fileSizes[fileIndex] % chunkSize
+            val numChunks = fileSizes[fileIndex] / CHUNK_SIZE
+            val remainder = fileSizes[fileIndex] % CHUNK_SIZE
             val chunkRanges = mutableListOf<String>()
 
             for (i in 0 until numChunks) {
-                val startIndex = i * chunkSize
-                val endIndex = startIndex + chunkSize - 1
+                val startIndex = i * CHUNK_SIZE
+                val endIndex = startIndex + CHUNK_SIZE - 1
                 chunkRanges.add("bytes=$startIndex-$endIndex")
             }
             if (remainder > 0) {
-                val startIndex = numChunks * chunkSize
+                val startIndex = numChunks * CHUNK_SIZE
                 val endIndex = startIndex + remainder - 1
                 chunkRanges.add("bytes=$startIndex-$endIndex")
             }
@@ -125,32 +182,9 @@ class HandleFileSystem(private val callback: (List<File>) -> Unit) {
             }
         }
 
-        fun splitFileIntoChunks(file: File, chunkSize: Int): List<ByteArray> {
-            val fileSize = file.length()
-
-            val chunks = mutableListOf<ByteArray>()
-
-            file.inputStream().use { inputStream ->
-                var bytesRead: Int
-                var totalBytesRead = 0
-                val buffer = ByteArray(chunkSize)
-
-                while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                    chunks.add(buffer.copyOfRange(0, bytesRead))
-                    totalBytesRead += bytesRead
-
-                    if (totalBytesRead >= fileSize) {
-                        break
-                    }
-                }
-            }
-
-            return chunks
-        }
-
-        fun getFileChunk(file: File, chunkId: Int, chunkSize: Int): ByteArray {
-            val startPos = chunkId * chunkSize
-            val chunkSizeToRead = minOf(chunkSize.toLong(), file.length() - startPos).toInt()
+        fun getFileChunk(file: File, chunkId: Int): ByteArray {
+            val startPos = chunkId * CHUNK_SIZE
+            val chunkSizeToRead = minOf(CHUNK_SIZE.toLong(), file.length() - startPos).toInt()
 
             val chunkData = ByteArray(chunkSizeToRead)
             file.inputStream().use { inputStream ->
@@ -158,7 +192,9 @@ class HandleFileSystem(private val callback: (List<File>) -> Unit) {
                 try {
                     inputStream.read(chunkData)
                 } catch (e: IOException) {
-                    // Handle read error
+                    println("READ ERROR")
+                } finally {
+                    inputStream.close()
                 }
             }
 
@@ -179,11 +215,6 @@ class HandleFileSystem(private val callback: (List<File>) -> Unit) {
 
                 else -> throw IllegalArgumentException("Unknown type: ${value.javaClass}")
             }
-        }
-
-        private fun getFileExtension(fileName: String): String {
-            val extension = fileName.substringAfterLast('.', "")
-            return if (extension.isNotEmpty()) ".$extension" else ""
         }
 
         private fun getOriginalFileName(contentResolver: ContentResolver, uri: Uri): String {

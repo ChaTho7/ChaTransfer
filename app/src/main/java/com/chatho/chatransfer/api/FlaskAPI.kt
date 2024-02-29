@@ -3,6 +3,7 @@ package com.chatho.chatransfer.api
 import android.net.Uri
 import android.util.Log
 import android.widget.Toast
+import androidx.lifecycle.lifecycleScope
 import com.chatho.chatransfer.Constants
 import com.chatho.chatransfer.Utils
 import com.chatho.chatransfer.handle.HandleFileSystem
@@ -12,7 +13,9 @@ import com.chatho.chatransfer.holder.DownloadFilesProgressHolder
 import com.chatho.chatransfer.holder.MainActivityHolder
 import com.chatho.chatransfer.view.MainActivity
 import com.google.gson.Gson
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -27,12 +30,15 @@ import java.io.FileOutputStream
 import java.net.ProtocolException
 import java.util.Date
 import java.util.concurrent.TimeUnit
+import kotlin.math.ceil
+import kotlin.math.min
 
 class FlaskAPI(private val handleNotification: HandleNotification?) {
     private val domain = "http://192.168.1.7:5050"
     private var activity = MainActivityHolder.activity as MainActivity
     private var totalBytesRead: Long = 0
     private var downloadedChunkStartIndexes: ArrayList<Long> = arrayListOf()
+    private var totalUploadedChunkSize = 0
 
     fun getServerStatus(callback: (Boolean) -> Unit) {
         val retrofit =
@@ -170,7 +176,7 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
                 var bytesRead: Int
 
                 val updateInterval =
-                    DownloadFilesProgressHolder.currentFilesSize / (if (DownloadFilesProgressHolder.currentFilesSize > 1024.0 * 1024.0 * 50.0) 1000 else 100) // Update every 0.1% if file size is bigger than 50 MB else 1% progress
+                    DownloadFilesProgressHolder.currentFilesSize / (if (DownloadFilesProgressHolder.currentFilesSize > 50 * 1024 * 1024) 1000 else 100)   // Update every 0.1% if file size is bigger than 50 MB else 1% progress
                 var bytesReadSinceLastUpdate = 0
 
                 val outputStream = FileOutputStream(File(tempFilePath))
@@ -318,19 +324,11 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
         UploadFilesProgressRequestBody.toUploadBytesTotal = files[0].length()
         UploadFilesProgressRequestBody.startTime = Date().time
 
-        val fileSizeInBytes = files[0].length()
-        val fileSizeInGB = fileSizeInBytes / (1024.0 * 1024.0 * 1024.0)
-        val chunkMethod = if (fileSizeInGB > 1.0) {
-            "splitFile"
-        } else {
-            "individual"
-        }
-
-        handleSingleFileUpload(files[0], 0, uploadFileCallback(files), chunkMethod)
+        handleSingleFileUpload(files[0], 0, uploadFileCallback(files))
     }
 
     private fun handleSingleFileUpload(
-        file: File, index: Int, callback: (Int) -> Unit, chunkMethod: String
+        file: File, index: Int, callback: (Int) -> Unit
     ) {
         val retrofit =
             Retrofit.Builder().baseUrl(domain).addConverterFactory(GsonConverterFactory.create())
@@ -362,33 +360,19 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
         handleNotification!!.startForeground()
 
         val fileUploadService = retrofit.create(FlaskApiService::class.java)
-        val defaultChunkSize = 2048 * 1024
 
-        when (chunkMethod) {
-            "splitFile" -> {
-                val chunks = HandleFileSystem.splitFileIntoChunks(file, defaultChunkSize)
+        activity.lifecycleScope.launch(Dispatchers.IO) {
+            val totalChunks = HandleFileSystem.calculateTotalChunks(file.length())
+            val batchSize = 10
+            val totalBatchs = ceil(totalChunks / batchSize.toDouble()).toInt()
 
-                for (chunkId in chunks.indices) {
-                    chunkUpload(
-                        chunkId,
-                        chunks.size,
-                        uploadProgressListener,
-                        file.name,
-                        chunks[chunkId],
-                        fileUploadService,
-                        callback,
-                        index
-                    )
-                }
-            }
+            for (batch in 0 until totalBatchs) {
+                val batchCompletion = CompletableDeferred<Unit>()
 
-            "individual" -> {
-
-                val totalChunks =
-                    HandleFileSystem.calculateTotalChunks(file.length(), defaultChunkSize)
-                for (chunkId in 0 until totalChunks) {
-                    val chunkData = HandleFileSystem.getFileChunk(file, chunkId, defaultChunkSize)
-
+                for (chunkId in batch * batchSize until min(
+                    (batch + 1) * batchSize, totalChunks
+                )) {
+                    val chunkData = HandleFileSystem.getFileChunk(file, chunkId)
                     chunkUpload(
                         chunkId,
                         totalChunks,
@@ -397,9 +381,12 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
                         chunkData,
                         fileUploadService,
                         callback,
-                        index
+                        index,
+                        batchCompletion
                     )
                 }
+
+                batchCompletion.await()
             }
         }
     }
@@ -412,10 +399,10 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
         chunkData: ByteArray,
         fileUploadService: FlaskApiService,
         callback: (Int) -> Unit,
-        index: Int
+        index: Int,
+        batchCompletion: CompletableDeferred<Unit>? = null
     ) {
-        val chunkIdRequestBody =
-            chunkId.toString().toRequestBody("text/plain".toMediaTypeOrNull())
+        val chunkIdRequestBody = chunkId.toString().toRequestBody("text/plain".toMediaTypeOrNull())
         val totalChunksRequestBody =
             totalChunks.toString().toRequestBody("text/plain".toMediaTypeOrNull())
         val chunkRequestBody = UploadFilesProgressRequestBody(
@@ -436,32 +423,69 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
                 if (response.isSuccessful) {
                     val responseBody = response.body()!!
                     if (responseBody.success) {
-                        if (responseBody.data.type == "file") {
-                            Log.i("Upload File", responseBody.message)
+                        totalUploadedChunkSize += 1
+                        if (totalUploadedChunkSize % 10 == 0) batchCompletion?.complete(
+                            Unit
+                        )
+                        if (totalUploadedChunkSize == totalChunks) {
+                            totalUploadedChunkSize = 0
                             callback(index)
-                        } else {
-                            Log.i("Upload File", responseBody.message)
                         }
                     } else {
                         Log.v("Upload File", "Process has failed:")
                         Log.v("Upload File", responseBody.message)
+
+                        chunkUpload(
+                            chunkId,
+                            totalChunks,
+                            uploadProgressListener,
+                            filename,
+                            chunkData,
+                            fileUploadService,
+                            callback,
+                            index,
+                            batchCompletion
+                        )
                     }
                 } else {
                     Log.v("Upload File", "Http request has failed:")
                     Log.v("Upload File", response.errorBody().toString())
+
+                    chunkUpload(
+                        chunkId,
+                        totalChunks,
+                        uploadProgressListener,
+                        filename,
+                        chunkData,
+                        fileUploadService,
+                        callback,
+                        index,
+                        batchCompletion
+                    )
                 }
             }
 
             override fun onFailure(call: Call<UploadFilesResponse>, t: Throwable) {
-                Log.e("Upload File", "Failure has occurred:")
+                Log.e("Upload File", "Failure has occurred on $chunkId:")
                 Log.e("Upload File", t.message ?: "Failure has no message...")
+
+                chunkUpload(
+                    chunkId,
+                    totalChunks,
+                    uploadProgressListener,
+                    filename,
+                    chunkData,
+                    fileUploadService,
+                    callback,
+                    index,
+                    batchCompletion
+                )
             }
         })
     }
 
     private fun uploadFileCallback(files: List<File>): (Int) -> Unit {
         return { uploadedIndex ->
-
             if (uploadedIndex == files.size - 1) {
                 activity.runOnUiThread {
                     activity.uploadFilesProgressCallback(true, null, null)
@@ -471,23 +495,12 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
                     files.map { file -> "${Constants.uploadNotificationEmoji} ${file.name}" })
                 clearPathDirectory(activity.cacheDir)
             } else {
-                val fileSizeInBytes = files[uploadedIndex + 1].length()
-                val fileSizeInGB = fileSizeInBytes / (1024.0 * 1024.0 * 1024.0)
-                val chunkMethod = if (fileSizeInGB > 1.0) {
-                    "splitFile"
-                } else {
-                    "individual"
-                }
-
                 UploadFilesProgressRequestBody.totalBytesRead = 0L
                 UploadFilesProgressRequestBody.toUploadBytesTotal =
                     files[uploadedIndex + 1].length()
 
                 handleSingleFileUpload(
-                    files[uploadedIndex + 1],
-                    uploadedIndex + 1,
-                    uploadFileCallback(files),
-                    chunkMethod
+                    files[uploadedIndex + 1], uploadedIndex + 1, uploadFileCallback(files)
                 )
             }
         }
