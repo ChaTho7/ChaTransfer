@@ -1,12 +1,15 @@
 package com.chatho.chatransfer.handle
 
+import android.app.ActivityManager
 import android.content.ContentResolver
+import android.content.Context
 import android.database.Cursor
 import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import android.text.format.Formatter
 import android.util.Log
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -107,6 +110,7 @@ class HandleFileSystem(private val callback: (List<File>) -> Unit) {
 
     companion object {
         private const val CHUNK_SIZE = 2 * 1024 * 1024  // 2 MB
+        const val BATCH_SIZE = 50
         var uploadFileList: List<File>? = null
 
         fun getDownloadsDirectory(): String? {
@@ -229,6 +233,33 @@ class HandleFileSystem(private val callback: (List<File>) -> Unit) {
             }
             // If the display name couldn't be retrieved, fall back to using the last segment of the URI as the file name
             return uri.lastPathSegment ?: throw IllegalArgumentException("Invalid URI: $uri")
+        }
+
+        fun logMemoryUsage() {
+            val activity = MainActivityHolder.activity
+            val memoryInfo = ActivityManager.MemoryInfo()
+            (activity.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).getMemoryInfo(
+                memoryInfo
+            )
+            val nativeHeapSize = memoryInfo.totalMem
+            val nativeHeapFreeSize = memoryInfo.availMem
+            val usedMemInBytes = nativeHeapSize - nativeHeapFreeSize
+            val usedMemInPercentage = usedMemInBytes * 100 / nativeHeapSize
+            Log.d(
+                "MemoryLog", "Total: ${
+                    Formatter.formatFileSize(
+                        activity, nativeHeapSize
+                    )
+                }" + "\nFree: ${
+                    Formatter.formatFileSize(
+                        activity, nativeHeapFreeSize
+                    )
+                }" + "\nUsed: ${
+                    Formatter.formatFileSize(
+                        activity, usedMemInBytes
+                    )
+                } ($usedMemInPercentage%)"
+            )
         }
     }
 }

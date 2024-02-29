@@ -4,6 +4,7 @@ import android.net.Uri
 import android.util.Log
 import android.widget.Toast
 import androidx.lifecycle.lifecycleScope
+import com.chatho.chatransfer.BuildConfig
 import com.chatho.chatransfer.Constants
 import com.chatho.chatransfer.Utils
 import com.chatho.chatransfer.handle.HandleFileSystem
@@ -361,16 +362,16 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
 
         val fileUploadService = retrofit.create(FlaskApiService::class.java)
 
+        HandleFileSystem.logMemoryUsage()
         activity.lifecycleScope.launch(Dispatchers.IO) {
             val totalChunks = HandleFileSystem.calculateTotalChunks(file.length())
-            val batchSize = 10
-            val totalBatchs = ceil(totalChunks / batchSize.toDouble()).toInt()
+            val totalBatchs = ceil(totalChunks / HandleFileSystem.BATCH_SIZE.toDouble()).toInt()
 
             for (batch in 0 until totalBatchs) {
                 val batchCompletion = CompletableDeferred<Unit>()
 
-                for (chunkId in batch * batchSize until min(
-                    (batch + 1) * batchSize, totalChunks
+                for (chunkId in batch * HandleFileSystem.BATCH_SIZE until min(
+                    (batch + 1) * HandleFileSystem.BATCH_SIZE, totalChunks
                 )) {
                     val chunkData = HandleFileSystem.getFileChunk(file, chunkId)
                     chunkUpload(
@@ -386,6 +387,7 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
                     )
                 }
 
+                HandleFileSystem.logMemoryUsage()
                 batchCompletion.await()
             }
         }
@@ -424,7 +426,7 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
                     val responseBody = response.body()!!
                     if (responseBody.success) {
                         totalUploadedChunkSize += 1
-                        if (totalUploadedChunkSize % 10 == 0) batchCompletion?.complete(
+                        if (totalUploadedChunkSize % HandleFileSystem.BATCH_SIZE == 0 || totalUploadedChunkSize == totalChunks) batchCompletion?.complete(
                             Unit
                         )
                         if (totalUploadedChunkSize == totalChunks) {
@@ -469,17 +471,28 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
                 Log.e("Upload File", "Failure has occurred on $chunkId:")
                 Log.e("Upload File", t.message ?: "Failure has no message...")
 
-                chunkUpload(
-                    chunkId,
-                    totalChunks,
-                    uploadProgressListener,
-                    filename,
-                    chunkData,
-                    fileUploadService,
-                    callback,
-                    index,
-                    batchCompletion
-                )
+                if (t.message == "unexpected end of stream" && BuildConfig.BUILD_TYPE == "debug") { // Emulator bug...
+                    totalUploadedChunkSize += 1
+                    if (totalUploadedChunkSize % HandleFileSystem.BATCH_SIZE == 0 || totalUploadedChunkSize == totalChunks) batchCompletion?.complete(
+                        Unit
+                    )
+                    if (totalUploadedChunkSize == totalChunks) {
+                        totalUploadedChunkSize = 0
+                        callback(index)
+                    }
+                } else {
+                    chunkUpload(
+                        chunkId,
+                        totalChunks,
+                        uploadProgressListener,
+                        filename,
+                        chunkData,
+                        fileUploadService,
+                        callback,
+                        index,
+                        batchCompletion
+                    )
+                }
             }
         })
     }
