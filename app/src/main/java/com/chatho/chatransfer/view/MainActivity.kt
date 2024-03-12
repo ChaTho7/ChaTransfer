@@ -121,7 +121,7 @@ class MainActivity : AppCompatActivity() {
     private fun getServerStatus(callback: (() -> Any)?) {
         binding.swStatus.text = "SERVER STATUS:"
         binding.progressBar.visibility = View.VISIBLE
-        binding.retryButton.visibility = View.INVISIBLE
+        binding.retryButton.visibility = View.GONE
 
         Toast.makeText(this, "Retrying to connect to server...", Toast.LENGTH_SHORT).show()
 
@@ -217,7 +217,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setServerStatus() {
-        binding.retryButton.visibility = View.INVISIBLE.takeIf { isServerOnline } ?: View.VISIBLE
+        binding.retryButton.visibility = View.GONE.takeIf { isServerOnline } ?: View.VISIBLE
 
         val spannableStringBuilder = SpannableStringBuilder()
 

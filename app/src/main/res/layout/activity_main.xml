@@ -26,12 +26,11 @@
         android:id="@+id/sw_status"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
         android:text="SERVER STATUS:"
         android:textColor="@color/dark_blue"
         android:textSize="12sp"
-        app:layout_constraintBottom_toTopOf="@+id/retry_button"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.5"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/page_title" />
 
@@ -39,23 +38,58 @@
         android:id="@+id/retry_button"
         android:layout_width="wrap_content"
         android:layout_height="36dp"
-        android:layout_marginTop="36dp"
+        android:layout_marginTop="8dp"
         android:backgroundTint="@color/dark_blue"
         android:text="RETRY CONNECTION"
         android:textColor="@color/white"
         android:textSize="10sp"
-        android:visibility="invisible"
+        android:visibility="gone"
         app:cornerRadius="10dp"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.498"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/page_title" />
+        app:layout_constraintTop_toBottomOf="@+id/sw_status" />
+
+    <androidx.cardview.widget.CardView
+        android:id="@+id/server_files_card_view"
+        android:layout_width="337dp"
+        android:layout_height="120dp"
+        android:layout_marginTop="16dp"
+        app:cardCornerRadius="20dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/retry_button">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/server_files"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/black_bg"
+            android:paddingLeft="15dp"
+            android:paddingTop="15dp"
+            android:paddingRight="15dp"
+            android:paddingBottom="15dp"
+            android:scrollbars="vertical" />
+    </androidx.cardview.widget.CardView>
+
+    <Button
+        android:id="@+id/get_files_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:backgroundTint="@color/cyan"
+        android:text="GET FILES"
+        android:textColor="@color/black"
+        android:textSize="16sp"
+        app:cornerRadius="20dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/server_files_card_view" />
 
     <Button
         android:id="@+id/upload_files_button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="2dp"
         android:backgroundTint="@color/red"
         android:text="UPLOAD FILES"
         android:textColor="@color/black"
@@ -66,42 +100,50 @@
         app:layout_constraintTop_toBottomOf="@+id/get_files_button" />
 
     <Button
-        android:id="@+id/download_files_button"
+        android:id="@+id/select_all_files_button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="2dp"
         android:backgroundTint="@color/dark_blue"
-        android:text="DOWNLOAD FILES"
+        android:text="SELECT ALL FILES"
         android:textColor="@color/white"
         android:textSize="16sp"
         android:visibility="gone"
         app:cornerRadius="20dp"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.498"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/upload_files_button" />
 
-    <Button
-        android:id="@+id/get_files_button"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="144dp"
-        android:backgroundTint="@color/cyan"
-        android:text="GET FILES"
-        android:textColor="@color/black"
-        android:textSize="16sp"
-        app:cornerRadius="20dp"
+    <androidx.cardview.widget.CardView
+        android:id="@+id/selected_files_card"
+        android:layout_width="337dp"
+        android:layout_height="120dp"
+        android:layout_marginTop="16dp"
+        android:visibility="gone"
+        app:cardCornerRadius="20dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/retry_button" />
+        app:layout_constraintTop_toBottomOf="@+id/select_all_files_button">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/selected_files"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/black_bg"
+            android:paddingLeft="15dp"
+            android:paddingTop="15dp"
+            android:paddingRight="15dp"
+            android:paddingBottom="15dp"
+            android:scrollbars="vertical" />
+    </androidx.cardview.widget.CardView>
 
     <Button
-        android:id="@+id/select_all_files_button"
+        android:id="@+id/download_files_button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
         android:backgroundTint="@color/dark_blue"
-        android:text="SELECT ALL FILES"
+        android:text="DOWNLOAD SELECTED FILES"
         android:textColor="@color/white"
         android:textSize="16sp"
         android:visibility="gone"
@@ -114,7 +156,7 @@
         android:id="@+id/clear_selected_files_button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="2dp"
         android:backgroundTint="@color/red"
         android:text="CLEAR SELECTED FILES"
         android:textColor="@color/black"
@@ -122,9 +164,8 @@
         android:visibility="gone"
         app:cornerRadius="20dp"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.501"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/select_all_files_button" />
+        app:layout_constraintTop_toBottomOf="@+id/download_files_button" />
 
     <TextView
         android:id="@+id/progress"
@@ -141,28 +182,6 @@
         app:layout_constraintHorizontal_bias="0.5"
         app:layout_constraintStart_toStartOf="parent" />
 
-    <androidx.cardview.widget.CardView
-        android:layout_width="337dp"
-        android:layout_height="120dp"
-        app:cardCornerRadius="20dp"
-        app:layout_constraintBottom_toTopOf="@+id/get_files_button"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.5"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/retry_button">
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/server_files"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@drawable/black_bg"
-            android:paddingLeft="15dp"
-            android:paddingTop="15dp"
-            android:paddingRight="15dp"
-            android:paddingBottom="15dp"
-            android:scrollbars="vertical" />
-    </androidx.cardview.widget.CardView>
-
     <ProgressBar
         android:id="@+id/progressBar"
         style="?android:attr/progressBarStyle"
@@ -173,29 +192,5 @@
         app:layout_constraintBottom_toTopOf="@+id/retry_button"
         app:layout_constraintStart_toEndOf="@+id/sw_status"
         app:layout_constraintTop_toBottomOf="@+id/page_title" />
-
-    <androidx.cardview.widget.CardView
-        android:id="@+id/selected_files_card"
-        android:layout_width="337dp"
-        android:layout_height="120dp"
-        android:layout_marginTop="16dp"
-        android:visibility="gone"
-        app:cardCornerRadius="20dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.5"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/download_files_button">
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/selected_files"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@drawable/black_bg"
-            android:paddingLeft="15dp"
-            android:paddingTop="15dp"
-            android:paddingRight="15dp"
-            android:paddingBottom="15dp"
-            android:scrollbars="vertical" />
-    </androidx.cardview.widget.CardView>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
