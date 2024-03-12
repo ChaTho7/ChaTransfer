@@ -24,13 +24,14 @@ import com.chatho.chatransfer.handle.HandlePermission
 import com.chatho.chatransfer.holder.DownloadFilesProgressHolder
 import com.chatho.chatransfer.holder.MainActivityHolder
 import java.io.File
+import kotlin.reflect.KFunction
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var api: FlaskAPI
     private lateinit var filePicker: HandleFileSystem
     private var handlePermission = HandlePermission(this)
-    private lateinit var selectedFilesAdapter : SelectedFilesRecyclerAdapter
+    private lateinit var selectedFilesAdapter: SelectedFilesRecyclerAdapter
     private var serverFilesAdapter: ServerFilesRecyclerAdapter? = null
     private var isServerOnline: Boolean = false
 
@@ -39,7 +40,7 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        selectedFilesAdapter  = SelectedFilesRecyclerAdapter(arrayListOf(), binding)
+        selectedFilesAdapter = SelectedFilesRecyclerAdapter(arrayListOf(), binding)
         setAppName()
         MainActivityHolder.activity = this
         api = FlaskAPI(null)
@@ -52,10 +53,7 @@ class MainActivity : AppCompatActivity() {
             handlePermission.getRuntimePermissions()
         }
 
-        api.getServerStatus {
-            isServerOnline = it
-            runOnUiThread { setServerStatus() }
-        }
+        getServerStatus(null)
 
         handleLayouts()
         handleListeners()
@@ -99,16 +97,16 @@ class MainActivity : AppCompatActivity() {
 
     private fun handleListeners() {
         binding.retryButton.setOnClickListener {
-            getServerStatus(null)
+            getServerStatus(null, true)
         }
         binding.uploadFilesButton.setOnClickListener {
-            uploadFiles()
+            getServerStatus(::uploadFiles)
         }
         binding.downloadFilesButton.setOnClickListener {
-            downloadFiles()
+            getServerStatus(::downloadFiles)
         }
         binding.getFilesButton.setOnClickListener {
-            getFilesFromApi()
+            getServerStatus(::getFilesFromApi)
         }
         binding.selectAllFilesButton.setOnClickListener {
             selectAllFiles()
@@ -118,87 +116,104 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun getServerStatus(callback: (() -> Any)?) {
+    private fun getServerStatus(callback: (() -> Any)?, isRetry: Boolean = false) {
         binding.swStatus.text = "SERVER STATUS:"
         binding.progressBar.visibility = View.VISIBLE
         binding.retryButton.visibility = View.GONE
 
-        Toast.makeText(this, "Retrying to connect to server...", Toast.LENGTH_SHORT).show()
+        if (isRetry) Toast.makeText(this, "Retrying to connect to server...", Toast.LENGTH_SHORT)
+            .show()
 
         api.getServerStatus {
             isServerOnline = it
             runOnUiThread { setServerStatus() }
-            if (callback != null && isServerOnline) callback()
-        }
-    }
+            if (callback != null) {
+                if (isServerOnline) {
+                    callback()
+                } else {
+                    serverFilesAdapter = ServerFilesRecyclerAdapter(listOf(), selectedFilesAdapter)
+                    binding.serverFiles.adapter = serverFilesAdapter
+                    clearSelectedFiles()
 
-    private fun getFilesFromApi() {
-        if (isServerOnline) {
-            api.getFileInfoList { fileInfoList ->
-                serverFilesAdapter = ServerFilesRecyclerAdapter(fileInfoList, selectedFilesAdapter)
-                binding.serverFiles.adapter = serverFilesAdapter
+                    binding.downloadFilesButton.visibility = View.GONE
+                    binding.selectedFilesCard.visibility = View.GONE
+                    binding.selectAllFilesButton.visibility = View.GONE
+                    binding.clearSelectedFilesButton.visibility = View.GONE
 
-                binding.downloadFilesButton.visibility = View.VISIBLE
-                binding.selectedFilesCard.visibility = View.VISIBLE
-                binding.selectAllFilesButton.visibility = View.VISIBLE
-                binding.clearSelectedFilesButton.visibility = View.VISIBLE
+                    val annotation =
+                        (callback as KFunction<*>).annotations.firstOrNull { annotation ->
+                            annotation is FunctionInfo
+                        } as FunctionInfo?
+                    val errorMessage =
+                        if (annotation?.description.isNullOrBlank()) "Server connection has failed. Please make sure server is online."
+                        else "\"${annotation!!.description}\" has failed. Please make sure server is online."
+
+                    Toast.makeText(
+                        this, errorMessage, Toast.LENGTH_LONG
+                    ).show()
+                }
             }
-        } else {
-            getServerStatus(::getFilesFromApi)
         }
     }
 
+    @FunctionInfo("Get Files")
+    private fun getFilesFromApi() {
+        api.getFileInfoList { fileInfoList ->
+            serverFilesAdapter = ServerFilesRecyclerAdapter(fileInfoList, selectedFilesAdapter)
+            binding.serverFiles.adapter = serverFilesAdapter
+
+            binding.downloadFilesButton.visibility = View.VISIBLE
+            binding.selectedFilesCard.visibility = View.VISIBLE
+            binding.selectAllFilesButton.visibility = View.VISIBLE
+            binding.clearSelectedFilesButton.visibility = View.VISIBLE
+        }
+    }
+
+    @FunctionInfo("Upload Files")
     private fun uploadFiles() {
-        if (isServerOnline) {
+        if (handlePermission.allRuntimePermissionsGranted()) {
+            filePicker.getFilePickerLauncher.launch("*/*")
+        } else {
+            handlePermission.getRuntimePermissions()
+        }
+    }
+
+    @FunctionInfo("Download Files")
+    private fun downloadFiles() {
+        if (selectedFilesAdapter.selectedFiles.size > 0) {
             if (handlePermission.allRuntimePermissionsGranted()) {
-                filePicker.getFilePickerLauncher.launch("*/*")
+                val saveFolderPath = getDownloadsDirectory().let { "$it/ChaTransfer" }
+                val directory = File(saveFolderPath)
+                val directoryExists = directory.exists()
+
+                if (directoryExists) {
+                    DownloadFilesProgressHolder.saveFolderPath = saveFolderPath
+                    HandleNotification.startDownloadFiles(
+                        this, selectedFilesAdapter.selectedFiles
+                    )
+
+                } else {
+                    directory.mkdirs().let { isDirectoryCreated ->
+                        if (isDirectoryCreated) {
+                            DownloadFilesProgressHolder.saveFolderPath = saveFolderPath
+                            HandleNotification.startDownloadFiles(
+                                this, selectedFilesAdapter.selectedFiles
+                            )
+
+                        } else {
+                            Toast.makeText(
+                                this,
+                                "There is an error while download directory has been creating.",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
+                }
             } else {
                 handlePermission.getRuntimePermissions()
             }
         } else {
-            getServerStatus(::uploadFiles)
-        }
-    }
-
-    private fun downloadFiles() {
-        if (isServerOnline) {
-            if (selectedFilesAdapter.selectedFiles.size > 0) {
-                if (handlePermission.allRuntimePermissionsGranted()) {
-                    val saveFolderPath = getDownloadsDirectory().let { "$it/ChaTransfer" }
-                    val directory = File(saveFolderPath)
-                    val directoryExists = directory.exists()
-
-                    if (directoryExists) {
-                        DownloadFilesProgressHolder.saveFolderPath = saveFolderPath
-                        HandleNotification.startDownloadFiles(
-                            this, selectedFilesAdapter.selectedFiles
-                        )
-
-                    } else {
-                        directory.mkdirs().let { isDirectoryCreated ->
-                            if (isDirectoryCreated) {
-                                DownloadFilesProgressHolder.saveFolderPath = saveFolderPath
-                                HandleNotification.startDownloadFiles(
-                                    this, selectedFilesAdapter.selectedFiles
-                                )
-
-                            } else {
-                                Toast.makeText(
-                                    this,
-                                    "There is an error while download directory has been creating.",
-                                    Toast.LENGTH_LONG
-                                ).show()
-                            }
-                        }
-                    }
-                } else {
-                    handlePermission.getRuntimePermissions()
-                }
-            } else {
-                Toast.makeText(this, "There is no file selected.", Toast.LENGTH_LONG).show()
-            }
-        } else {
-            getServerStatus(::downloadFiles)
+            Toast.makeText(this, "There is no file selected.", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -268,4 +283,8 @@ class MainActivity : AppCompatActivity() {
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         controller.hide(WindowInsetsCompat.Type.navigationBars())
     }
+
+    @Retention(AnnotationRetention.RUNTIME)
+    @Target(AnnotationTarget.FUNCTION)
+    annotation class FunctionInfo(val description: String)
 }

@@ -20,5 +20,18 @@
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
 
+# API
 -keep,allowoptimization,allowobfuscation class com.chatho.chatransfer.api.** { *; }
 -keepclasseswithmembers class com.chatho.chatransfer.api.** { *; }
+
+# Reflection
+-keepnames class com.chatho.chatransfer.view.MainActivity {
+    void getFilesFromApi();
+    void uploadFiles();
+    void downloadFiles();
+}
+-keep class * {
+    public void getFilesFromApi();
+    public void uploadFiles();
+    public void downloadFiles();
+}
