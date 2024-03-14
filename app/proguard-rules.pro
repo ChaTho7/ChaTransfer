@@ -23,15 +23,13 @@
 # API
 -keep,allowoptimization,allowobfuscation class com.chatho.chatransfer.api.** { *; }
 -keepclasseswithmembers class com.chatho.chatransfer.api.** { *; }
+-keep,allowoptimization,allowobfuscation class retrofit2.Call { *; }
 
 # Reflection
--keepnames class com.chatho.chatransfer.view.MainActivity {
+-keep,allowoptimization,allowobfuscation class com.chatho.chatransfer.view.MainActivity {
     void getFilesFromApi();
     void uploadFiles();
     void downloadFiles();
 }
--keep class * {
-    public void getFilesFromApi();
-    public void uploadFiles();
-    public void downloadFiles();
-}
+-keep,allowoptimization,allowobfuscation class kotlin.Unit { *; }
+-keep,allowoptimization,allowobfuscation class kotlin.coroutines.Continuation { *; }

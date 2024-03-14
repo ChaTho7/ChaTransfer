@@ -191,7 +191,6 @@ class MainActivity : AppCompatActivity() {
                     HandleNotification.startDownloadFiles(
                         this, selectedFilesAdapter.selectedFiles
                     )
-
                 } else {
                     directory.mkdirs().let { isDirectoryCreated ->
                         if (isDirectoryCreated) {
@@ -199,7 +198,6 @@ class MainActivity : AppCompatActivity() {
                             HandleNotification.startDownloadFiles(
                                 this, selectedFilesAdapter.selectedFiles
                             )
-
                         } else {
                             Toast.makeText(
                                 this,
