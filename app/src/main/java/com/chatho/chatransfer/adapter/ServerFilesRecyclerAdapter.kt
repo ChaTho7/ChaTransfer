@@ -13,7 +13,7 @@ class ServerFilesRecyclerAdapter(
 ) : RecyclerView.Adapter<ServerFilesRecyclerAdapter.ServerFilesVH>() {
 
     class ServerFilesVH(val binding: ServerFilesRecyclerBinding) :
-        RecyclerView.ViewHolder(binding.root) {}
+        RecyclerView.ViewHolder(binding.root)
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ServerFilesVH {
         val binding =

@@ -47,7 +47,8 @@ class UploadFilesProgressRequestBody(
     companion object {
         var totalBytesRead = 0L
         var toUploadBytesTotal = 0L
-        var totalFilesSize = 0
+        var totalFilesCount = 0
+        var totalFilesSize = 0L
         var startTime = 0L
         var endTime = 0L
         private const val DEFAULT_BUFFER_SIZE = 2048

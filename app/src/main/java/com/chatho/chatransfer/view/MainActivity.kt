@@ -15,25 +15,26 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.chatho.chatransfer.R
 import com.chatho.chatransfer.adapter.SelectedFilesRecyclerAdapter
 import com.chatho.chatransfer.adapter.ServerFilesRecyclerAdapter
+import com.chatho.chatransfer.api.API_METHOD
 import com.chatho.chatransfer.api.FlaskAPI
 import com.chatho.chatransfer.databinding.ActivityMainBinding
+import com.chatho.chatransfer.handle.HandleAPI
 import com.chatho.chatransfer.handle.HandleFileSystem
 import com.chatho.chatransfer.handle.HandleFileSystem.Companion.getDownloadsDirectory
-import com.chatho.chatransfer.handle.HandleNotification
 import com.chatho.chatransfer.handle.HandlePermission
 import com.chatho.chatransfer.holder.DownloadFilesProgressHolder
-import com.chatho.chatransfer.holder.MainActivityHolder
+import com.chatho.chatransfer.holder.MainActivityHolder.isServerOnline
 import java.io.File
 import kotlin.reflect.KFunction
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var api: FlaskAPI
+    private lateinit var handleAPI: HandleAPI
     private lateinit var filePicker: HandleFileSystem
     private var handlePermission = HandlePermission(this)
     private lateinit var selectedFilesAdapter: SelectedFilesRecyclerAdapter
     private var serverFilesAdapter: ServerFilesRecyclerAdapter? = null
-    private var isServerOnline: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,11 +43,12 @@ class MainActivity : AppCompatActivity() {
 
         selectedFilesAdapter = SelectedFilesRecyclerAdapter(arrayListOf(), binding)
         setAppName()
-        MainActivityHolder.activity = this
-        api = FlaskAPI(null)
+        api = FlaskAPI(this, null)
+        handleAPI = HandleAPI(this, api)
 
-        filePicker = HandleFileSystem { fileList ->
-            HandleNotification.startUploadFiles(this, fileList)
+        filePicker = HandleFileSystem(this) { fileList ->
+            handleAPI.uploadFileList = fileList
+            handleAPI.startService(API_METHOD.UPLOAD)
         }
 
         if (!handlePermission.allRuntimePermissionsGranted()) {
@@ -188,16 +190,16 @@ class MainActivity : AppCompatActivity() {
 
                 if (directoryExists) {
                     DownloadFilesProgressHolder.saveFolderPath = saveFolderPath
-                    HandleNotification.startDownloadFiles(
-                        this, selectedFilesAdapter.selectedFiles
-                    )
+
+                    handleAPI.downloadFileInfoList = selectedFilesAdapter.selectedFiles
+                    handleAPI.startService(API_METHOD.DOWNLOAD)
                 } else {
                     directory.mkdirs().let { isDirectoryCreated ->
                         if (isDirectoryCreated) {
                             DownloadFilesProgressHolder.saveFolderPath = saveFolderPath
-                            HandleNotification.startDownloadFiles(
-                                this, selectedFilesAdapter.selectedFiles
-                            )
+
+                            handleAPI.downloadFileInfoList = selectedFilesAdapter.selectedFiles
+                            handleAPI.startService(API_METHOD.DOWNLOAD)
                         } else {
                             Toast.makeText(
                                 this,

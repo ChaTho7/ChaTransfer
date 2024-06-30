@@ -1,6 +1,7 @@
 package com.chatho.chatransfer.adapter
 
 import android.content.Context
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.widget.Toast
@@ -36,11 +37,12 @@ class SelectedFilesRecyclerAdapter(
             parentView.requestLayout()
         }
         holder.binding.selectedFileFilename.text = selectedFiles[position].filename
-        holder.binding.selectedFileSize.text = "${
+        val fileSizeText = "${
             Utils.toDouble(
                 (selectedFiles[position].fileSize.toDouble()) / (1024.0 * 1024.0), 2
             )
         } MB"
+        holder.binding.selectedFileSize.text = fileSizeText
         holder.itemView.setOnClickListener {
             removeSelectedFile(position)
         }
@@ -58,12 +60,16 @@ class SelectedFilesRecyclerAdapter(
 
     fun selectAllFiles(context: Context, fileInfoList: ArrayList<GetFileInfoListResponse>) {
         if (fileInfoList.size > 0) {
+            val currentSize = selectedFiles.size
             selectedFiles.clear()
+            notifyItemRangeRemoved(0, currentSize)
+
             selectedFiles.addAll(fileInfoList)
-            println("All files added to download list.")
-            notifyDataSetChanged()
-            mainActivityBinding.clearSelectedFilesButton.text =
-                "CLEAR SELECTED (${itemCount}) FILES (${getFilesTotalSize()} MB)"
+            Log.i("SELECTED FILES RECYCLER ADAPTER", "ALL FILES ARE SELECTED TO DOWNLOAD LIST")
+            notifyItemRangeInserted(0, selectedFiles.size)
+
+            val buttonText = "CLEAR SELECTED (${itemCount}) FILES (${getFilesTotalSize()} MB)"
+            mainActivityBinding.clearSelectedFilesButton.text = buttonText
         } else {
             Toast.makeText(context, "There is no file fetched from server.", Toast.LENGTH_SHORT)
                 .show()
@@ -71,11 +77,14 @@ class SelectedFilesRecyclerAdapter(
     }
 
     fun removeAllFiles(context: Context) {
-        if (selectedFiles.size > 0) {
+        val size = selectedFiles.size
+        if (size > 0) {
             selectedFiles.clear()
-            println("All files removed from download list.")
-            notifyDataSetChanged()
-            mainActivityBinding.clearSelectedFilesButton.text = "CLEAR SELECTED FILES"
+            Log.i("SELECTED FILES RECYCLER ADAPTER", "ALL FILES ARE REMOVED FROM DOWNLOAD LIST")
+            notifyItemRangeRemoved(0, size)
+
+            val buttonText = "CLEAR SELECTED FILES"
+            mainActivityBinding.clearSelectedFilesButton.text = buttonText
         } else {
             Toast.makeText(context, "There is no file selected.", Toast.LENGTH_SHORT).show()
         }
@@ -84,19 +93,27 @@ class SelectedFilesRecyclerAdapter(
     fun addNewSelectedFile(fileInfo: GetFileInfoListResponse) {
         if (!selectedFiles.any { it.filename == fileInfo.filename }) {
             selectedFiles.add(0, fileInfo)
-            println("${fileInfo.filename} added to download list.")
-            notifyDataSetChanged()
-            mainActivityBinding.clearSelectedFilesButton.text =
-                "CLEAR SELECTED (${itemCount}) FILES (${getFilesTotalSize()} MB)"
+            Log.i(
+                "SELECTED FILES RECYCLER ADAPTER", "${fileInfo.filename} IS ADDED TO DOWNLOAD LIST"
+            )
+            notifyItemInserted(0)
+            notifyItemRangeChanged(0, selectedFiles.size)
+
+            val buttonText = "CLEAR SELECTED (${itemCount}) FILES (${getFilesTotalSize()} MB)"
+            mainActivityBinding.clearSelectedFilesButton.text = buttonText
         }
     }
 
     private fun removeSelectedFile(index: Int) {
         val fileInfo = selectedFiles.removeAt(index)
-        println("${fileInfo.filename} removed from download list.")
+        Log.i(
+            "SELECTED FILES RECYCLER ADAPTER", "${fileInfo.filename} IS REMOVED FROM DOWNLOAD LIST"
+        )
         notifyItemRemoved(index)
-        notifyItemRangeChanged(index, selectedFiles.size)
-        mainActivityBinding.clearSelectedFilesButton.text =
+        notifyItemRangeChanged(index, selectedFiles.size - index)
+
+        val buttonText =
             "CLEAR SELECTED${if (itemCount > 0) " (${itemCount}) " else " "}FILES${if (itemCount > 0) " (${getFilesTotalSize()} MB)" else ""}"
+        mainActivityBinding.clearSelectedFilesButton.text = buttonText
     }
 }

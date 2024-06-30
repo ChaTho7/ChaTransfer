@@ -43,3 +43,5 @@ data class UploadFilesResponse(
 )
 
 data class UploadFilesResponseData(val type: String, val name: String)
+
+enum class API_METHOD {UPLOAD, DOWNLOAD}

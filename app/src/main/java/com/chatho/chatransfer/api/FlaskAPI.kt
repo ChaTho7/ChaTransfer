@@ -11,7 +11,6 @@ import com.chatho.chatransfer.handle.HandleFileSystem
 import com.chatho.chatransfer.handle.HandleFileSystem.Companion.clearPathDirectory
 import com.chatho.chatransfer.handle.HandleNotification
 import com.chatho.chatransfer.holder.DownloadFilesProgressHolder
-import com.chatho.chatransfer.holder.MainActivityHolder
 import com.chatho.chatransfer.view.MainActivity
 import com.google.gson.Gson
 import kotlinx.coroutines.CompletableDeferred
@@ -34,9 +33,10 @@ import java.util.concurrent.TimeUnit
 import kotlin.math.ceil
 import kotlin.math.min
 
-class FlaskAPI(private val handleNotification: HandleNotification?) {
+class FlaskAPI(
+    private var activity: MainActivity, private val handleNotification: HandleNotification?
+) {
     private val domain = "http://192.168.1.7:5050"
-    private var activity = MainActivityHolder.activity as MainActivity
     private var totalBytesRead: Long = 0
     private var downloadedChunkStartIndexes: ArrayList<Long> = arrayListOf()
     private var totalUploadedChunkSize = 0
@@ -128,13 +128,14 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
         val filenames = fileInfoList.map { it.filename }
         val fileSizes = fileInfoList.map { it.fileSize }
 
-        val chunkRanges = HandleFileSystem.calculateChunkRanges(fileSizes, 0)
+        val chunkRanges = HandleFileSystem.calculateChunkRanges(fileSizes[0])
         val downloadedChunks = mutableListOf<DownloadedChunk>()
 
         handleNotification!!.startForeground()
-        DownloadFilesProgressHolder.totalFilesSize = filenames.size
+        DownloadFilesProgressHolder.totalFilesCount = filenames.size
+        DownloadFilesProgressHolder.totalFilesSize = fileSizes.sumOf { it.toLong() }
         DownloadFilesProgressHolder.startTime = Date().time
-        DownloadFilesProgressHolder.currentFilesSize = fileSizes[0].toLong()
+        DownloadFilesProgressHolder.currentFileSize = fileSizes[0].toLong()
 
         Log.i("Download File", "${filenames[0]}'S TOTAL CHUNK SIZE: ${chunkRanges.size}")
 
@@ -171,13 +172,13 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
                 val apiService = retrofit.create(FlaskApiService::class.java)
 
                 val responseBody = apiService.downloadFile(encodedFilename, rangeHeader)
-                Log.i("Download File", "$startIndex CHUNK HAS BEEN CAME")
+                Log.i("Download File", "${chunkIndex + 1}. ($startIndex) CHUNK HAS BEEN CAME")
 
                 val buffer = ByteArray(responseBody.contentLength().toInt())
                 var bytesRead: Int
 
                 val updateInterval =
-                    DownloadFilesProgressHolder.currentFilesSize / (if (DownloadFilesProgressHolder.currentFilesSize > 50 * 1024 * 1024) 1000 else 100)   // Update every 0.1% if file size is bigger than 50 MB else 1% progress
+                    DownloadFilesProgressHolder.currentFileSize / (if (DownloadFilesProgressHolder.currentFileSize > 50 * 1024 * 1024) 1000 else 100)   // Update every 0.1% if file size is bigger than 50 MB else 1% progress
                 var bytesReadSinceLastUpdate = 0
 
                 val outputStream = FileOutputStream(File(tempFilePath))
@@ -192,9 +193,9 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
                         bytesReadSinceLastUpdate = 0
 
                         val progress =
-                            (totalBytesRead.toDouble() / DownloadFilesProgressHolder.currentFilesSize * 100).toInt()
+                            (totalBytesRead.toDouble() / DownloadFilesProgressHolder.currentFileSize * 100).toInt()
                         handleNotification!!.updateForeground(
-                            "downloadFiles", progress, filename, fileIndex
+                            progress, filename, fileIndex
                         )
 
                         activity.runOnUiThread {
@@ -219,7 +220,6 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
 
                     downloadedChunks.add(DownloadedChunk(startIndex, endIndex, tempFilePath))
                     handleNotification!!.updateForeground(
-                        "downloadFiles",
                         ((downloadedChunks.size.toDouble() / chunkSize) * 100).toInt(),
                         filename,
                         fileIndex
@@ -287,14 +287,13 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
 
             if (downloadedFileIndex == filenames.size - 1) {
                 DownloadFilesProgressHolder.endTime = Date().time
-                handleNotification!!.finishForeground("downloadFiles",
-                    filenames.map { filename -> "${Constants.downloadNotificationEmoji} $filename" })
+                handleNotification!!.finishForeground(filenames.map { filename -> "${Constants.downloadNotificationEmoji} $filename" })
             } else {
                 val newChunkRanges =
-                    HandleFileSystem.calculateChunkRanges(fileSizes, downloadedFileIndex + 1)
+                    HandleFileSystem.calculateChunkRanges(fileSizes[downloadedFileIndex + 1])
                 val newDownloadedChunks = mutableListOf<DownloadedChunk>()
 
-                DownloadFilesProgressHolder.currentFilesSize =
+                DownloadFilesProgressHolder.currentFileSize =
                     fileSizes[downloadedFileIndex + 1].toLong()
                 Log.i(
                     "Download File",
@@ -320,7 +319,8 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
     }
 
     fun uploadFiles(files: List<File>) {
-        UploadFilesProgressRequestBody.totalFilesSize = files.size
+        UploadFilesProgressRequestBody.totalFilesCount = files.size
+        UploadFilesProgressRequestBody.totalFilesSize = files.sumOf { it.length() }
         UploadFilesProgressRequestBody.totalBytesRead = 0L
         UploadFilesProgressRequestBody.toUploadBytesTotal = files[0].length()
         UploadFilesProgressRequestBody.startTime = Date().time
@@ -347,7 +347,7 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
 
                     if (progress != oldProgress) {
                         handleNotification!!.updateForeground(
-                            "uploadFiles", progress, fileName, index
+                            progress, fileName, index
                         )
                         activity.runOnUiThread {
                             activity.uploadFilesProgressCallback(false, fileName, progress)
@@ -362,7 +362,7 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
 
         val fileUploadService = retrofit.create(FlaskApiService::class.java)
 
-        HandleFileSystem.logMemoryUsage()
+        HandleFileSystem.logMemoryUsage(activity)
         activity.lifecycleScope.launch(Dispatchers.IO) {
             val totalChunks = HandleFileSystem.calculateTotalChunks(file.length())
             val totalBatchs = ceil(totalChunks / HandleFileSystem.BATCH_SIZE.toDouble()).toInt()
@@ -387,7 +387,7 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
                     )
                 }
 
-                HandleFileSystem.logMemoryUsage()
+                HandleFileSystem.logMemoryUsage(activity)
                 batchCompletion.await()
             }
         }
@@ -504,8 +504,7 @@ class FlaskAPI(private val handleNotification: HandleNotification?) {
                     activity.uploadFilesProgressCallback(true, null, null)
                 }
                 UploadFilesProgressRequestBody.endTime = Date().time
-                handleNotification!!.finishForeground("uploadFiles",
-                    files.map { file -> "${Constants.uploadNotificationEmoji} ${file.name}" })
+                handleNotification!!.finishForeground(files.map { file -> "${Constants.uploadNotificationEmoji} ${file.name}" })
                 clearPathDirectory(activity.cacheDir)
             } else {
                 UploadFilesProgressRequestBody.totalBytesRead = 0L

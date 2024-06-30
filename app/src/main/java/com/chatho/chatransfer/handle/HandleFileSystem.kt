@@ -14,14 +14,15 @@ import android.util.Log
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import com.chatho.chatransfer.api.FlaskAPI
-import com.chatho.chatransfer.holder.MainActivityHolder
+import com.chatho.chatransfer.view.MainActivity
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
 
-class HandleFileSystem(private val callback: (List<File>) -> Unit) {
-    private val activity = MainActivityHolder.activity
+class HandleFileSystem(
+    private var activity: MainActivity, private val callback: (List<File>) -> Unit
+) {
     var getFilePickerLauncher: ActivityResultLauncher<String>
 
     init {
@@ -55,7 +56,6 @@ class HandleFileSystem(private val callback: (List<File>) -> Unit) {
                 }
 
                 if (fileList.isNotEmpty()) {
-                    uploadFileList = fileList
                     callback(fileList)
                 }
             }
@@ -111,7 +111,6 @@ class HandleFileSystem(private val callback: (List<File>) -> Unit) {
     companion object {
         private const val CHUNK_SIZE = 2 * 1024 * 1024  // 2 MB
         const val BATCH_SIZE = 50
-        var uploadFileList: List<File>? = null
 
         fun getDownloadsDirectory(): String? {
             val directory =
@@ -122,11 +121,11 @@ class HandleFileSystem(private val callback: (List<File>) -> Unit) {
         fun clearPathDirectory(path: File) {
             Log.i("HandleFileSystem", "-----CACHE CLEANING STARTING-----")
             path.absoluteFile.listFiles()?.forEach { file ->
-                println(file.name)
                 if (file.isDirectory) {
                     clearPathDirectory(file)
                 } else {
                     file.delete()
+                    Log.d("HandleFileSystem", "File Deleted: ${file.name}")
                 }
             }
             Log.i("HandleFileSystem", "-----CACHE CLEANING FINISHED-----")
@@ -136,9 +135,9 @@ class HandleFileSystem(private val callback: (List<File>) -> Unit) {
             return ((fileSize + CHUNK_SIZE - 1) / CHUNK_SIZE).toInt()
         }
 
-        fun calculateChunkRanges(fileSizes: List<Int>, fileIndex: Int): MutableList<String> {
-            val numChunks = fileSizes[fileIndex] / CHUNK_SIZE
-            val remainder = fileSizes[fileIndex] % CHUNK_SIZE
+        fun calculateChunkRanges(fileSize: Int): MutableList<String> {
+            val numChunks = fileSize / CHUNK_SIZE
+            val remainder = fileSize % CHUNK_SIZE
             val chunkRanges = mutableListOf<String>()
 
             for (i in 0 until numChunks) {
@@ -168,7 +167,10 @@ class HandleFileSystem(private val callback: (List<File>) -> Unit) {
                     while (true) {
                         val chunk = chunks.find { it.startIndex == sortedDownloadedChunkStartIndex }
                         if (chunk != null) {
-                            Log.e("Download File", "$sortedDownloadedChunkStartIndex COMBINING")
+                            Log.e(
+                                "Download File",
+                                "${(sortedDownloadedChunkStartIndex / CHUNK_SIZE) + 1}. ($sortedDownloadedChunkStartIndex) CHUNK COMBINING"
+                            )
                             FileInputStream(chunk.tempFilePath).use { inputStream ->
                                 inputStream.copyTo(outputStream)
                             }
@@ -176,12 +178,11 @@ class HandleFileSystem(private val callback: (List<File>) -> Unit) {
                         } else {
                             Log.e(
                                 "Download File",
-                                "$sortedDownloadedChunkStartIndex WAITING TO COMBINE"
+                                "${(sortedDownloadedChunkStartIndex / CHUNK_SIZE) + 1}. ($sortedDownloadedChunkStartIndex) CHUNK WAITING TO COMBINE"
                             )
                             Thread.sleep(FlaskAPI.THREAD_SLEEP_TIME)
                         }
                     }
-
                 }
             }
         }
@@ -235,8 +236,7 @@ class HandleFileSystem(private val callback: (List<File>) -> Unit) {
             return uri.lastPathSegment ?: throw IllegalArgumentException("Invalid URI: $uri")
         }
 
-        fun logMemoryUsage() {
-            val activity = MainActivityHolder.activity
+        fun logMemoryUsage(activity: MainActivity) {
             val memoryInfo = ActivityManager.MemoryInfo()
             (activity.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).getMemoryInfo(
                 memoryInfo
