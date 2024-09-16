@@ -1,12 +1,9 @@
 package com.chatho.chatransfer.handle
 
 import android.app.ActivityManager
-import android.content.ContentResolver
 import android.content.Context
-import android.database.Cursor
 import android.media.MediaScannerConnection
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.text.format.Formatter
@@ -62,38 +59,36 @@ class HandleFileSystem(
         }
     }
 
-    private fun getDataColumn(
-        contentResolver: ContentResolver, originalFileName: String
-    ): String? {
-//        val folderFile = File(Environment.getExternalStorageDirectory().absolutePath)
-//        folderFile.listFiles()?.forEach {
-//            scanFiles(it)
-//        }
+    fun getFileFromUri(uri: Uri): File? {
+        var filePath: String? = null
 
-//        contentResolver.delete(uri, null, null)
+        if ("file".equals(uri.scheme, true)) {
+            filePath = uri.path
+        } else if ("content".equals(uri.scheme, true)) {
+            val file = File(
+                Environment.getExternalStorageDirectory().absolutePath + "/${
+                    uri.lastPathSegment?.substringAfter(
+                        ":"
+                    )
+                }"
+            )
 
-
-        var cursor: Cursor? = null
-        val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL)
-        } else {
-            MediaStore.Files.getContentUri("external")
-        }
-        val projection = arrayOf(MediaStore.Files.FileColumns.DATA)
-        val selection = "${MediaStore.Files.FileColumns.DISPLAY_NAME} = ?"
-        val includedArgs = arrayOf(originalFileName)
-        val selectionArgs = includedArgs.map { arg -> "%$arg%" }.toTypedArray()
-
-        try {
-            cursor = contentResolver.query(uri, projection, selection, selectionArgs, null)
-            if (cursor != null && cursor.moveToFirst()) {
-                val pathColumn = cursor.getColumnIndex(MediaStore.Files.FileColumns.DATA)
-                return cursor.getString(pathColumn)
+            if (file.isFile) {
+                filePath = file.path
+            } else {
+                val projection = arrayOf(MediaStore.Files.FileColumns.DATA)
+                val cursor = activity.contentResolver.query(uri, projection, null, null, null)
+                cursor?.use {
+                    if (it.moveToFirst()) {
+                        val columnIndex =
+                            it.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATA)
+                        filePath = it.getString(columnIndex)
+                    }
+                }
             }
-        } finally {
-            cursor?.close()
         }
-        return null
+
+        return filePath?.let { path -> File(path).takeIf { it.isFile } }
     }
 
     private fun scanFiles(file: File) {
@@ -220,20 +215,6 @@ class HandleFileSystem(
 
                 else -> throw IllegalArgumentException("Unknown type: ${value.javaClass}")
             }
-        }
-
-        private fun getOriginalFileName(contentResolver: ContentResolver, uri: Uri): String {
-            val cursor = contentResolver.query(uri, null, null, null, null)
-            cursor?.use {
-                if (it.moveToFirst()) {
-                    val displayName = it.getString(it.getColumnIndexOrThrow("_display_name"))
-                    if (displayName != null) {
-                        return displayName
-                    }
-                }
-            }
-            // If the display name couldn't be retrieved, fall back to using the last segment of the URI as the file name
-            return uri.lastPathSegment ?: throw IllegalArgumentException("Invalid URI: $uri")
         }
 
         fun logMemoryUsage(activity: MainActivity) {

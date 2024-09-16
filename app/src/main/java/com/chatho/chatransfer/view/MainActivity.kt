@@ -1,6 +1,9 @@
 package com.chatho.chatransfer.view
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.os.Parcelable
 import android.text.SpannableString
 import android.text.SpannableStringBuilder
 import android.text.style.ForegroundColorSpan
@@ -31,7 +34,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var api: FlaskAPI
     private lateinit var handleAPI: HandleAPI
-    private lateinit var filePicker: HandleFileSystem
+    private lateinit var fileSystem: HandleFileSystem
     private var handlePermission = HandlePermission(this)
     private lateinit var selectedFilesAdapter: SelectedFilesRecyclerAdapter
     private var serverFilesAdapter: ServerFilesRecyclerAdapter? = null
@@ -46,7 +49,7 @@ class MainActivity : AppCompatActivity() {
         api = FlaskAPI(this, null)
         handleAPI = HandleAPI(this, api)
 
-        filePicker = HandleFileSystem(this) { fileList ->
+        fileSystem = HandleFileSystem(this) { fileList ->
             handleAPI.uploadFileList = fileList
             handleAPI.startService(API_METHOD.UPLOAD)
         }
@@ -55,16 +58,24 @@ class MainActivity : AppCompatActivity() {
             handlePermission.getRuntimePermissions()
         }
 
-        getServerStatus(null)
-
         handleLayouts()
         handleListeners()
+        handleIntent()
     }
 
     override fun onResume() {
         super.onResume()
 
         hideSystemBars()
+    }
+
+    override fun onPause() {
+        super.onPause()
+
+        if (HandleAPI.SERVICE_BOUND) {
+            unbindService(handleAPI.serviceConnection)
+            HandleAPI.SERVICE_BOUND = false
+        }
     }
 
     fun downloadFilesProgressCallback(fileName: String, progress: Int) {
@@ -86,6 +97,52 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(
                 this, "Upload Completed", Toast.LENGTH_LONG
             ).show()
+        }
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+
+        when (intent?.action) {
+            Intent.ACTION_SEND -> {
+                (intent.getParcelableExtra<Parcelable>(Intent.EXTRA_STREAM) as? Uri)?.let { uri ->
+                    getServerStatus({
+                        handleUploadWithIntent(uri = uri)
+                    })
+                }
+            }
+
+            Intent.ACTION_SEND_MULTIPLE -> {
+                (intent.getParcelableArrayListExtra<Parcelable>(Intent.EXTRA_STREAM) as? ArrayList<Uri>)?.let { uris ->
+                    getServerStatus({
+                        handleUploadWithIntent(uris = uris)
+                    })
+                }
+            }
+
+            else -> getServerStatus(null)
+        }
+    }
+
+    private fun handleIntent() {
+        when (intent.action) {
+            Intent.ACTION_SEND -> {
+                (intent.getParcelableExtra<Parcelable>(Intent.EXTRA_STREAM) as? Uri)?.let { uri ->
+                    getServerStatus({
+                        handleUploadWithIntent(uri = uri)
+                    })
+                }
+            }
+
+            Intent.ACTION_SEND_MULTIPLE -> {
+                (intent.getParcelableArrayListExtra<Parcelable>(Intent.EXTRA_STREAM) as? ArrayList<Uri>)?.let { uris ->
+                    getServerStatus({
+                        handleUploadWithIntent(uris = uris)
+                    })
+                }
+            }
+
+            else -> getServerStatus(null)
         }
     }
 
@@ -115,6 +172,25 @@ class MainActivity : AppCompatActivity() {
         }
         binding.clearSelectedFilesButton.setOnClickListener {
             clearSelectedFiles()
+        }
+    }
+
+    private fun handleUploadWithIntent(uri: Uri? = null, uris: ArrayList<Uri>? = null) {
+        var fileList: List<File> = listOf()
+        if (uri != null) {
+            fileSystem.getFileFromUri(uri)?.let {
+                fileList = fileList.plus(it)
+            }
+        }
+        if (uris != null) {
+            fileList = uris.mapNotNull {
+                fileSystem.getFileFromUri(it)
+            }
+        }
+
+        if (fileList.isNotEmpty()) {
+            handleAPI.uploadFileList = fileList
+            handleAPI.startService(API_METHOD.UPLOAD)
         }
     }
 
@@ -174,7 +250,7 @@ class MainActivity : AppCompatActivity() {
     @FunctionInfo("Upload Files")
     private fun uploadFiles() {
         if (handlePermission.allRuntimePermissionsGranted()) {
-            filePicker.getFilePickerLauncher.launch("*/*")
+            fileSystem.getFilePickerLauncher.launch("*/*")
         } else {
             handlePermission.getRuntimePermissions()
         }

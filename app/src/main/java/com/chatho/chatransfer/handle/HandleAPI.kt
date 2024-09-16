@@ -14,9 +14,16 @@ import com.chatho.chatransfer.view.MainActivity
 import java.io.File
 
 class HandleAPI(private var activity: MainActivity, private var api: FlaskAPI) {
-    private val serviceConnection = object : ServiceConnection {
-        lateinit var binder: HandleNotification.ServiceBinder
+    interface CustomServiceConnection : ServiceConnection {
+        fun getBinder(): HandleNotification.ServiceBinder?
+    }
+
+    val serviceConnection = object : CustomServiceConnection {
+        private lateinit var binder: HandleNotification.ServiceBinder
+
         override fun onServiceConnected(p0: ComponentName?, service: IBinder?) {
+            SERVICE_BOUND = true
+
             binder = service as HandleNotification.ServiceBinder
             val runningServiceInstance = binder.getServiceInstance()
             api = FlaskAPI(activity, runningServiceInstance)
@@ -28,26 +35,52 @@ class HandleAPI(private var activity: MainActivity, private var api: FlaskAPI) {
             }
         }
 
-        override fun onServiceDisconnected(p0: ComponentName?) {
+        override fun onBindingDied(name: ComponentName?) {
+            SERVICE_BOUND = false
+
             api = FlaskAPI(activity, null)
         }
+
+        override fun onNullBinding(name: ComponentName?) {
+            SERVICE_BOUND = false
+
+            api = FlaskAPI(activity, null)
+        }
+
+        override fun onServiceDisconnected(p0: ComponentName?) {
+            SERVICE_BOUND = false
+
+            api = FlaskAPI(activity, null)
+        }
+
+        override fun getBinder(): HandleNotification.ServiceBinder {
+            return binder
+        }
     }
+
     var uploadFileList: List<File>? = null
     var downloadFileInfoList: ArrayList<GetFileInfoListResponse>? = null
 
     internal fun startService(apiMethod: API_METHOD) {
-        if (isServiceRunning(HandleNotification::class.java)) {
-            serviceConnection.binder.setApiMethod(apiMethod)
+        val intent = Intent(activity, HandleNotification::class.java)
+        intent.putExtra("API_METHOD", apiMethod)
+
+        if (!SERVICE_BOUND) {
+            if (!isServiceRunning(HandleNotification::class.java)) {
+                ContextCompat.startForegroundService(activity, intent)
+            } else {
+                activity.stopService(intent)
+                ContextCompat.startForegroundService(activity, intent)
+            }
+
+            activity.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+        } else {
+            serviceConnection.getBinder()!!.setApiMethod(apiMethod)
             when (apiMethod) {
                 API_METHOD.UPLOAD -> startUpload()
 
                 API_METHOD.DOWNLOAD -> startDownload()
             }
-        } else {
-            val intent = Intent(activity, HandleNotification::class.java)
-            intent.putExtra("API_METHOD", apiMethod)
-            ContextCompat.startForegroundService(activity, intent)
-            activity.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
         }
     }
 
@@ -67,5 +100,9 @@ class HandleAPI(private var activity: MainActivity, private var api: FlaskAPI) {
             }
         }
         return false
+    }
+
+    companion object {
+        var SERVICE_BOUND = false
     }
 }
