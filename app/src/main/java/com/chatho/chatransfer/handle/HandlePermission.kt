@@ -25,13 +25,18 @@ class HandlePermission(private val activity: AppCompatActivity) {
         private const val TAG = "MainActivity"
         private const val PERMISSION_REQUESTS = 1
 
-        private val REQUIRED_RUNTIME_PERMISSIONS = arrayOf(
-            Manifest.permission.MANAGE_EXTERNAL_STORAGE,
-            Manifest.permission.READ_EXTERNAL_STORAGE,
-            Manifest.permission.WRITE_EXTERNAL_STORAGE,
-            Manifest.permission.FOREGROUND_SERVICE,
-            Manifest.permission.POST_NOTIFICATIONS
-        )
+        private val REQUIRED_RUNTIME_PERMISSIONS =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) arrayOf(
+                Manifest.permission.MANAGE_EXTERNAL_STORAGE,
+                Manifest.permission.FOREGROUND_SERVICE,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) else arrayOf(
+                Manifest.permission.MANAGE_EXTERNAL_STORAGE,
+                Manifest.permission.READ_EXTERNAL_STORAGE,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                Manifest.permission.FOREGROUND_SERVICE,
+                Manifest.permission.POST_NOTIFICATIONS
+            )
     }
 
     fun allRuntimePermissionsGranted(): Boolean {
@@ -89,6 +94,8 @@ class HandlePermission(private val activity: AppCompatActivity) {
                 Log.i(TAG, "Permission granted: $permission")
                 true
             } else {
+                Toast.makeText(activity, "Permission NOT granted: $permission", Toast.LENGTH_SHORT)
+                    .show()
                 Log.i(TAG, "Permission NOT granted: $permission")
                 false
             }
@@ -101,6 +108,7 @@ class HandlePermission(private val activity: AppCompatActivity) {
             Log.i(TAG, "Permission granted: $permission")
             return true
         }
+        Toast.makeText(activity, "Permission NOT granted: $permission", Toast.LENGTH_SHORT).show()
         Log.i(TAG, "Permission NOT granted: $permission")
         return false
     }

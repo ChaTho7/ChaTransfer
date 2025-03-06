@@ -38,6 +38,7 @@
         android:layout_height="wrap_content"
         android:layout_marginEnd="4dp"
         android:text="TextView"
+        android:textColor="@color/white"
         android:textSize="10sp"
         app:layout_constraintBottom_toBottomOf="@+id/selected_file_filename"
         app:layout_constraintEnd_toEndOf="@+id/straightLineView"
